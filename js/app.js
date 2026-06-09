@@ -1927,7 +1927,11 @@ function renderGuestbook(){
     <div class="guestbook-top"><div class="guestbook-name">${esc(m.name||"익명")}</div><div class="guestbook-date">${formatScoreDate(m.created_at)}</div></div>
     <div class="guestbook-content">${esc(m.content||"")}</div>
     ${replyHtml}
-    <div class="guest-reply-form" data-parent-id="${esc(m.id)}">
+    <button class="guest-reply-toggle" type="button" data-parent-id="${esc(m.id)}" aria-expanded="false">
+      <span class="guest-reply-arrow">⌄</span>
+      <span>대댓글 달기${replies.length?` · ${replies.length}개`:""}</span>
+    </button>
+    <div class="guest-reply-form collapsed" data-parent-id="${esc(m.id)}">
       <div class="guest-reply-title">대댓글</div>
       <input class="input guest-reply-name" maxlength="20" placeholder="이름">
       <textarea class="input guest-reply-content-input" maxlength="300" placeholder="내용"></textarea>
@@ -1935,6 +1939,24 @@ function renderGuestbook(){
     </div>
   </div>
  `}).join("");
+ list.querySelectorAll(".guest-reply-toggle").forEach(btn=>{
+  btn.onclick=()=>{
+   const parentId=btn.dataset.parentId;
+   const form=list.querySelector(`.guest-reply-form[data-parent-id="${CSS.escape(parentId)}"]`);
+   if(!form)return;
+   const willOpen=form.classList.contains("collapsed");
+   form.classList.toggle("collapsed",!willOpen);
+   btn.setAttribute("aria-expanded",willOpen?"true":"false");
+   const arrow=btn.querySelector(".guest-reply-arrow");
+   if(arrow)arrow.textContent=willOpen?"⌃":"⌄";
+   const label=btn.querySelector("span:last-child");
+   if(label)label.textContent=willOpen?"대댓글 닫기":"대댓글 달기";
+   if(willOpen){
+     const input=form.querySelector(".guest-reply-name");
+     setTimeout(()=>{if(input)input.focus()},50);
+   }
+  };
+ });
  list.querySelectorAll(".guest-reply-send").forEach(btn=>{
   btn.onclick=()=>{
    const form=btn.closest(".guest-reply-form");
