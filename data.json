@@ -1,15 +1,8 @@
 {
   "app": "simple_budget_sheets",
-  "version": 4,
-  "state": {
-    "version": 4,
-    "currentSheetId": "default",
-    "sheets": [
-      {
-        "id": "default",
-        "name": "기본 예산표",
-        "items": []
-      }
-    ]
-  }
+  "encrypted": true,
+  "method": "xor-base64",
+  "version": 10,
+  "updatedAt": "2026-06-09T08:18:18.317Z",
+  "data": "EUAcBxgRAw0EQFBTWk5IAR8QGAcEFjkKDwceKw5AUEAOBwwDHw4eQEZAGQoPBx4RSFgxGUgLDkBQQA4HDAMfDh5ARkAEAwcHSFhI6rmS67KSQuyZouyDku2QtkBGQAMWDw8ZQFA5EUADBkhYSFIPBwhWXlQJT10DWFtHVl8HDE9SUVxVR1EOAQ5SWgNbUVlUXUBGQAQDBwdIWEjsir/ruK5ARkALDwUXBBZIWFNSWlJaTkgWExIPQFBAAwwJDQcHSE5IBgsbSFhbUEZABA0eB0hYSEBGQAUQDgcYQFBSFz8XP0ZADQMHBxlAUBlIFg8WGAsZQFAZSAAPER4xCQ0YB0hYWk5IEA8BBRAOEUhYMT8XTkgGAwwFQFAZSAAPER4xCQ0YB0hYWk5IEA8BBRAOEUhYMT8XTkgACw8IDQVAUBlIAA8RHjEJDRgHSFhaTkgQDwEFEA4RSFgxPxcfFw=="
 }
