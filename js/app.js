@@ -1924,13 +1924,19 @@ function renderGuestbook(){
   `:"";
   return `
   <div class="guestbook-item">
-    <div class="guestbook-top"><div class="guestbook-name">${esc(m.name||"익명")}</div><div class="guestbook-date">${formatScoreDate(m.created_at)}</div></div>
+    <div class="guestbook-top">
+      <div class="guestbook-name-wrap">
+        <div class="guestbook-name">${esc(m.name||"익명")}</div>
+        <button class="guest-reply-toggle" type="button" data-parent-id="${esc(m.id)}" aria-expanded="false" title="대댓글 열기" aria-label="대댓글 열기">
+          <svg class="guest-reply-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M19 15 15 11v3H5V5H3v11h12v3l4-4Z"></path>
+          </svg>
+        </button>
+      </div>
+      <div class="guestbook-date">${formatScoreDate(m.created_at)}</div>
+    </div>
     <div class="guestbook-content">${esc(m.content||"")}</div>
     ${replyHtml}
-    <button class="guest-reply-toggle" type="button" data-parent-id="${esc(m.id)}" aria-expanded="false" title="대댓글 열기" aria-label="대댓글 열기">
-      <span class="guest-reply-arrow">ㄴ</span>
-      ${replies.length?`<span class="guest-reply-count">${replies.length}</span>`:""}
-    </button>
     <div class="guest-reply-form collapsed" data-parent-id="${esc(m.id)}">
       <div class="guest-reply-title">대댓글</div>
       <input class="input guest-reply-name" maxlength="20" placeholder="이름">
@@ -1947,8 +1953,6 @@ function renderGuestbook(){
    const willOpen=form.classList.contains("collapsed");
    form.classList.toggle("collapsed",!willOpen);
    btn.setAttribute("aria-expanded",willOpen?"true":"false");
-   const arrow=btn.querySelector(".guest-reply-arrow");
-   if(arrow)arrow.textContent=willOpen?"⌃":"ㄴ";
    btn.title=willOpen?"대댓글 닫기":"대댓글 열기";
    btn.setAttribute("aria-label",willOpen?"대댓글 닫기":"대댓글 열기");
    if(willOpen){
