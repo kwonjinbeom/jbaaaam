@@ -460,11 +460,10 @@ function lockTetrisPiece(){
      if(y>=0&&y<TETRIS_ROWS&&x>=0&&x<TETRIS_COLS)tetrisBoard[y][x]=tetrisPiece.color;
    }
  }
- addTetrisScore(10);
- if(!tetrisHintEnabled){
-   tetrisScoreValue+=1;
-   refreshTetrisDifficulty();
- }
+ // 블록 고정 점수는 난이도 배율을 적용하지 않는다.
+ // 힌트 ON: 추가점수 없음, 힌트 OFF: 마지막에 +2점
+ tetrisScoreValue += tetrisHintEnabled ? 0 : 2;
+ refreshTetrisDifficulty();
 }
 
 function clearTetrisLines(){
