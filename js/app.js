@@ -1544,7 +1544,7 @@ async function syncStateToSupabase({manual=false}={}){
  }
 }
 
-getGithubSetting=function(){return{owner:"Supabase",repo:"jbaaaam",branch:"public",path:"game_scores / budget_sheets / app_meta",token:SUPABASE_ANON_KEY,autoLoad:true,autoSave:true}};
+getGithubSetting=function(){return{owner:"Supabase",repo:"jbaaaam",branch:"public",path:"game_scores / budget_sheets / app_meta / guestbook",token:SUPABASE_ANON_KEY,autoLoad:true,autoSave:true}};
 saveGithubSetting=function(){closeGithubModal();alert("Supabase 정보는 index.html에 고정 반영되어 있어.")};
 openGithubModal=function(){
  $("ghOwnerInput").value=SUPABASE_URL;$("ghRepoInput").value="jbaaaam";$("ghBranchInput").value="public";$("ghPathInput").value="Supabase tables";$("ghTokenInput").value=SUPABASE_ANON_KEY;githubModalBackdrop.classList.add("open");
@@ -1552,7 +1552,7 @@ openGithubModal=function(){
 updateGithubStatus=function(){
  const enabled=isGitEnabled();if(gitEnabledToggle)gitEnabledToggle.checked=enabled;if(githubBox)githubBox.classList.toggle("git-off",!enabled);const errText=lastGithubError?`\n오류: ${lastGithubError}`:"";
  if(!enabled){githubStatus.textContent=`Supabase 공유 저장\n${lastSyncText}${errText}`;return}
- githubStatus.textContent=`Supabase 연결\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta\n${lastSyncText}${errText}`;
+ githubStatus.textContent=`Supabase 연결\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta / guestbook\n${lastSyncText}${errText}`;
 };
 toggleGitEnabled=function(){saveState();setGitEnabled(gitEnabledToggle.checked);clearTimeout(autoSaveTimer);lastGithubError="";if(isGitEnabled()){state=normalizeState(loadState());lastSyncText="Supabase 사용 ON";render();loadFromGithub({manual:false});showToast("Supabase 모드")}else{state=normalizeState(loadState());lastSyncText="Supabase 공유 저장 고정";render();showToast("Supabase 공유 저장 고정")}};
 loadFromGithub=async function({manual=false}={}){
@@ -1629,7 +1629,7 @@ updateGithubStatus=function(){
  const errText=lastGithubError?`\n오류: ${lastGithubError}`:"";
  if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=true;}
  if(githubBox)githubBox.classList.remove("git-off");
- githubStatus.textContent=`Supabase 공유 저장\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta\n${lastSyncText}${errText}`;
+ githubStatus.textContent=`Supabase 공유 저장\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta / guestbook\n${lastSyncText}${errText}`;
 };
 scheduleAutoSave=function(){
  if(isApplyingRemote)return;
@@ -1643,3 +1643,119 @@ lastSyncText="Supabase 불러오기 대기";
 if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=true;}
 render();
 setTimeout(()=>{updateGithubStatus();loadFromGithub({manual:false});},100);
+
+/* Menu cleanup + budget sheet list + guestbook */
+let guestbookMessages=[];
+
+function safeEl(id){return document.getElementById(id)}
+function bindClick(id,fn){const el=safeEl(id);if(el)el.onclick=fn}
+
+setMainView=function(view){
+ currentMainView=["home","budgetList","budget","tetris","dino","bamboo","guestbook"].includes(view)?view:"home";
+ const isHome=currentMainView==="home";
+ const isBudgetList=currentMainView==="budgetList";
+ const isBudget=currentMainView==="budget";
+ const isTetris=currentMainView==="tetris";
+ const isDino=currentMainView==="dino";
+ const isBamboo=currentMainView==="bamboo";
+ const isGuestbook=currentMainView==="guestbook";
+ [["homeView",isHome],["budgetListView",isBudgetList],["budgetView",isBudget],["tetrisView",isTetris],["dinoView",isDino],["bambooView",isBamboo],["guestbookView",isGuestbook]].forEach(([id,on])=>{const el=safeEl(id);if(el)el.classList.toggle("active",on)});
+ const add=safeEl("addBtn");if(add)add.style.display=isBudget?"block":"none";
+ const budgetMenu=safeEl("showBudgetBtn");if(budgetMenu)budgetMenu.classList.toggle("active",isBudget||isBudgetList);
+ const tetrisMenu=safeEl("showTetrisBtn");if(tetrisMenu)tetrisMenu.classList.toggle("active",isTetris);
+ const dinoMenu=safeEl("showDinoBtn");if(dinoMenu)dinoMenu.classList.toggle("active",isDino);
+ const bambooMenu=safeEl("showBambooBtn");if(bambooMenu)bambooMenu.classList.toggle("active",isBamboo);
+ closeDrawer();
+ if(isBudgetList)renderSheetList();
+ if(isTetris){initTetrisIfNeeded();drawTetris()}
+ if(isDino){initDinoIfNeeded();drawDino()}
+ if(isBamboo){initBambooIfNeeded();drawBamboo()}
+ if(isGuestbook)loadGuestbook({silent:true});
+};
+
+bindClick("menuBtnBudgetList",openDrawer);
+bindClick("menuBtnGuestbook",openDrawer);
+bindClick("drawerHomeBtn",()=>setMainView("home"));
+bindClick("showBudgetBtn",()=>setMainView("budgetList"));
+bindClick("showTetrisBtn",()=>setMainView("tetris"));
+bindClick("showDinoBtn",()=>setMainView("dino"));
+bindClick("showBambooBtn",()=>setMainView("bamboo"));
+bindClick("homeBudgetCard",()=>setMainView("budgetList"));
+bindClick("homeTetrisCard",()=>setMainView("tetris"));
+bindClick("homeDinoCard",()=>setMainView("dino"));
+bindClick("homeBambooCard",()=>setMainView("bamboo"));
+bindClick("guestMoreBtn",()=>setMainView("guestbook"));
+bindClick("guestSendBtn",submitGuestbookMessage);
+bindClick("guestbookRefreshBtn",()=>loadGuestbook({silent:false}));
+
+async function fetchGuestbookMessages(){
+ const rows=await sbFetch('/guestbook?select=id,name,content,created_at&order=created_at.desc&limit=200');
+ const list=Array.isArray(rows)?rows:[];
+ return list.map(m=>({
+  id:m.id||newId(),
+  name:String(m.name||"익명").slice(0,20),
+  content:String(m.content||"").slice(0,300),
+  created_at:m.created_at||new Date().toISOString()
+ })).filter(m=>m.content.trim());
+}
+
+async function insertGuestbookMessage(message){
+ const row={
+  name:String(message.name||"익명").slice(0,20),
+  content:String(message.content||"").slice(0,300)
+ };
+ await sbFetch('/guestbook',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify([row])});
+ guestbookMessages=await fetchGuestbookMessages();
+ return guestbookMessages;
+}
+
+function renderGuestbook(){
+ const list=safeEl("guestbookList");
+ if(!list)return;
+ if(!guestbookMessages.length){list.innerHTML='<div class="empty">아직 남긴 방명록이 없어.</div>';return}
+ list.innerHTML=guestbookMessages.map(m=>`
+  <div class="guestbook-item">
+    <div class="guestbook-top"><div class="guestbook-name">${esc(m.name||"익명")}</div><div class="guestbook-date">${formatScoreDate(m.created_at)}</div></div>
+    <div class="guestbook-content">${esc(m.content||"")}</div>
+  </div>
+ `).join("");
+}
+
+async function loadGuestbook({silent=false}={}){
+ const status=safeEl("guestMiniStatus");
+ try{
+  if(status&&!silent)status.textContent="방명록 불러오는 중...";
+  guestbookMessages=await fetchGuestbookMessages();
+  renderGuestbook();
+  if(status)status.textContent=guestbookMessages.length?`최근 ${guestbookMessages.length}개 표시 중`:"아직 방명록이 없어.";
+ }catch(e){
+  console.error(e);
+  if(status)status.textContent="방명록 불러오기 실패";
+  const list=safeEl("guestbookList");if(list)list.innerHTML=`<div class="empty">방명록 불러오기 실패<br>${esc(shortErrorText(e))}</div>`;
+ }
+}
+
+async function submitGuestbookMessage(){
+ const nameEl=safeEl("guestNameInput");
+ const contentEl=safeEl("guestContentInput");
+ const status=safeEl("guestMiniStatus");
+ const name=(nameEl&&nameEl.value.trim()?nameEl.value.trim():"익명").slice(0,20);
+ const content=(contentEl&&contentEl.value.trim()?contentEl.value.trim():"").slice(0,300);
+ if(!content){if(status)status.textContent="내용을 입력해줘.";if(contentEl)contentEl.focus();return}
+ try{
+  if(status)status.textContent="저장 중...";
+  await insertGuestbookMessage({name,content});
+  if(contentEl)contentEl.value="";
+  if(status)status.textContent="방명록 저장 완료";
+  renderGuestbook();
+  showToast("방명록 저장 완료");
+ }catch(e){
+  console.error(e);
+  if(status)status.textContent="방명록 저장 실패";
+  showToast("방명록 저장 실패","error");
+ }
+}
+
+// 메뉴 정리 후 현재 화면 활성 상태 보정
+setMainView(currentMainView||"home");
+setTimeout(()=>loadGuestbook({silent:true}),500);
