@@ -164,6 +164,7 @@ function saveScoreRecord(){
  localStorage.setItem("simple_budget_last_game_name",name);
  localStorage.setItem("simple_budget_last_tetris_name",name);
  state=normalizeState(state);
+ state.games[gameKey].records=(state.games[gameKey].records||[]).filter(r=>!(String(r.name||"")===name && Number(r.score)===Number(score)));
  state.games[gameKey].records.push({id:newId(),name,score,dt:new Date().toISOString()});
  state.games[gameKey].records=state.games[gameKey].records.sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,15);
  if(score>Number(state.games[gameKey].bestScore||0))state.games[gameKey].bestScore=score;
@@ -182,9 +183,7 @@ function formatScoreDate(iso){
  const yy=String(d.getFullYear()).slice(2);
  const mm=String(d.getMonth()+1).padStart(2,"0");
  const dd=String(d.getDate()).padStart(2,"0");
- const hh=String(d.getHours()).padStart(2,"0");
- const mi=String(d.getMinutes()).padStart(2,"0");
- return `${yy}.${mm}.${dd} ${hh}:${mi}`;
+ return `${yy}.${mm}.${dd}`;
 }
 function openGameScoreBoardModal(gameKey="tetris"){
  scoreBoardGameKey=gameKey;
@@ -319,7 +318,7 @@ function spawnTetrisPiece(){
 }
 
 function getTetrisLevel(score=tetrisScoreValue){
- return Math.floor(Number(score||0)/5000)+1;
+ return Math.floor(Number(score||0)/3000)+1;
 }
 
 function getTetrisDropMs(level=getTetrisLevel()){
@@ -447,6 +446,7 @@ function lockTetrisPiece(){
      if(y>=0&&y<TETRIS_ROWS&&x>=0&&x<TETRIS_COLS)tetrisBoard[y][x]=tetrisPiece.color;
    }
  }
+ addTetrisScore(10);
 }
 
 function clearTetrisLines(){
@@ -527,6 +527,34 @@ function drawNextQueue(){
  }
 }
 
+function getTetrisGhostY(){
+ if(!tetrisPiece)return 0;
+ let gy=tetrisPiece.y;
+ while(!collidesTetris(tetrisPiece.x,gy+1,tetrisPiece.shape))gy++;
+ return gy;
+}
+
+function drawTetrisGhost(){
+ if(!tetrisPiece)return;
+ const gy=getTetrisGhostY();
+ if(gy===tetrisPiece.y)return;
+ tetrisCtx.save();
+ tetrisCtx.globalAlpha=0.22;
+ for(let r=0;r<tetrisPiece.shape.length;r++){
+   for(let c=0;c<tetrisPiece.shape[r].length;c++){
+     if(!tetrisPiece.shape[r][c])continue;
+     const x=tetrisPiece.x+c,y=gy+r;
+     if(y<0||y>=TETRIS_ROWS||x<0||x>=TETRIS_COLS)continue;
+     tetrisCtx.fillStyle=tetrisPiece.color;
+     tetrisCtx.fillRect(x*TETRIS_BLOCK,y*TETRIS_BLOCK,TETRIS_BLOCK,TETRIS_BLOCK);
+     tetrisCtx.strokeStyle="#f9fafb";
+     tetrisCtx.lineWidth=2;
+     tetrisCtx.strokeRect(x*TETRIS_BLOCK+2,y*TETRIS_BLOCK+2,TETRIS_BLOCK-4,TETRIS_BLOCK-4);
+   }
+ }
+ tetrisCtx.restore();
+}
+
 function drawTetris(){
  if(!tetrisCtx)return;
  tetrisCtx.clearRect(0,0,TETRIS_COLS*TETRIS_BLOCK,TETRIS_ROWS*TETRIS_BLOCK);
@@ -549,6 +577,7 @@ function drawTetris(){
  }
 
  if(tetrisPiece){
+   drawTetrisGhost();
    for(let r=0;r<tetrisPiece.shape.length;r++){
      for(let c=0;c<tetrisPiece.shape[r].length;c++){
        if(tetrisPiece.shape[r][c])drawCell(tetrisPiece.x+c,tetrisPiece.y+r,tetrisPiece.color);
@@ -1594,10 +1623,20 @@ function collectLocalScores(){state=normalizeState(state);const arr=[];["tetris"
 async function pruneSupabaseGameScores(gameKey=null){
  const gameKeys=gameKey?[gameKey]:["tetris","dino","bamboo"];
  for(const g of gameKeys){
-  const rows=await sbFetch(`/game_scores?select=id,score,created_at&game_key=eq.${encodeURIComponent(g)}&order=score.desc,created_at.asc&limit=1000`);
-  const extra=(rows||[]).slice(15).map(r=>r.id).filter(Boolean);
-  if(extra.length){
-   await sbFetch(`/game_scores?id=in.(${extra.map(encodeURIComponent).join(",")})`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
+  const rows=await sbFetch(`/game_scores?select=id,name,score,created_at&game_key=eq.${encodeURIComponent(g)}&order=score.desc,created_at.asc&limit=1000`);
+  const seen=new Set();
+  const keep=[];
+  const remove=[];
+  (rows||[]).forEach(r=>{
+    const key=`${String(r.name||"").trim()}|${Number(r.score)||0}`;
+    if(seen.has(key)){remove.push(r.id);return;}
+    seen.add(key);
+    if(keep.length<15)keep.push(r);
+    else remove.push(r.id);
+  });
+  const ids=remove.filter(Boolean);
+  if(ids.length){
+   await sbFetch(`/game_scores?id=in.(${ids.map(encodeURIComponent).join(",")})`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
   }
  }
 }
