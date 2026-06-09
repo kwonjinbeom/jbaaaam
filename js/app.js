@@ -1591,20 +1591,6 @@ function mergeSheetForSupabase(remoteSheet,localSheet,deletedIds=[]){
  return {id:localSheet.id,name:localSheet.name||remoteSheet?.name||"예산표",items};
 }
 function collectLocalScores(){state=normalizeState(state);const arr=[];["tetris","dino","bamboo"].forEach(g=>{(state.games[g].records||[]).forEach(r=>{arr.push({game_key:g,name:String(r.name||"익명"),score:Number(r.score)||0,created_at:r.dt||new Date().toISOString()})})});return arr.filter(r=>r.score>0)}
-
-async function pruneScoresToTop15(gameKey=null){
- const games=gameKey?[gameKey]:["tetris","dino","bamboo"];
- let deleted=0;
- for(const g of games){
-   const rows=await sbFetch(`/game_scores?select=id,score,created_at&game_key=eq.${encodeURIComponent(g)}&order=score.desc,created_at.asc&limit=1000`);
-   const extra=(rows||[]).slice(15).filter(r=>r&&r.id);
-   for(const r of extra){
-     await sbFetch(`/game_scores?id=eq.${encodeURIComponent(r.id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
-     deleted++;
-   }
- }
- return deleted;
-}
 async function insertMissingScoresToSupabase(gameKey=null){
  const q=gameKey?`/game_scores?select=game_key,name,score&game_key=eq.${encodeURIComponent(gameKey)}&limit=1000`:'/game_scores?select=game_key,name,score&limit=1000';
  const existing=await sbFetch(q);
@@ -1613,7 +1599,6 @@ async function insertMissingScoresToSupabase(gameKey=null){
  const missing=[];
  local.forEach(r=>{const k=`${r.game_key}|${r.name}|${Number(r.score)||0}`;if(!keys.has(k)){keys.add(k);missing.push(r)}});
  if(missing.length)await sbFetch('/game_scores',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(missing)});
- await pruneScoresToTop15(gameKey);
  return missing.length;
 }
 async function syncStateToSupabase({manual=false}={}){
@@ -1639,7 +1624,6 @@ async function syncStateToSupabase({manual=false}={}){
   const currentId=mergedSheets.some(s=>s.id===state.currentSheetId)?state.currentSheetId:(mergedSheets[0]?.id||state.currentSheetId);
   await sbFetch('/app_meta?on_conflict=key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{key:'current_sheet_id',value:{id:currentId},updated_at:new Date().toISOString()}])});
   await insertMissingScoresToSupabase();
-  await pruneScoresToTop15();
   clearSheetDeletes();clearItemDeletesFor();
   const latest=await fetchSupabaseState();
   isApplyingRemote=true;state=normalizeState(latest);saveState();render();isApplyingRemote=false;
@@ -1665,7 +1649,7 @@ updateGithubStatus=function(){
 toggleGitEnabled=function(){saveState();setGitEnabled(gitEnabledToggle.checked);clearTimeout(autoSaveTimer);lastGithubError="";if(isGitEnabled()){state=normalizeState(loadState());lastSyncText="Supabase 사용 ON";render();loadFromGithub({manual:false});showToast("Supabase 모드")}else{state=normalizeState(loadState());lastSyncText="Supabase 공유 저장 고정";render();showToast("Supabase 공유 저장 고정")}};
 loadFromGithub=async function({manual=false}={}){
  if(!isGitEnabled()){if(manual)showToast("Supabase 공유 저장 고정");updateGithubStatus();return}
- try{lastSyncText="Supabase 불러오는 중...";lastGithubError="";updateGithubStatus();await insertMissingScoresToSupabase().catch(()=>0);await pruneScoresToTop15().catch(()=>0);const remote=await fetchSupabaseState();isApplyingRemote=true;state=normalizeState(remote);saveState();render();isApplyingRemote=false;lastSyncText=`Supabase 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("Supabase 불러오기 완료.")}
+ try{lastSyncText="Supabase 불러오는 중...";lastGithubError="";updateGithubStatus();await insertMissingScoresToSupabase().catch(()=>0);const remote=await fetchSupabaseState();isApplyingRemote=true;state=normalizeState(remote);saveState();render();isApplyingRemote=false;lastSyncText=`Supabase 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("Supabase 불러오기 완료.")}
  catch(e){console.error(e);isApplyingRemote=false;lastGithubError=shortErrorText(e);lastSyncText=`Supabase 불러오기 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 불러오기 실패","error");if(manual)alert("Supabase 불러오기 실패: "+lastGithubError)}
 };
 requestGithubSave=function({manual=false}={}){syncStateToSupabase({manual})};
@@ -1688,7 +1672,7 @@ if($('saveScoreRecordBtn'))$('saveScoreRecordBtn').onclick=saveScoreRecord;
 const originalOpenGameScoreBoardModalForSupabase=openGameScoreBoardModal;
 openGameScoreBoardModal=function(gameKey="tetris"){
  if(isGitEnabled()){
-   insertMissingScoresToSupabase(gameKey).then(()=>pruneScoresToTop15(gameKey)).then(()=>fetchSupabaseState()).then(remote=>{state.games[gameKey]=remote.games[gameKey];saveState();originalOpenGameScoreBoardModalForSupabase(gameKey);}).catch(()=>originalOpenGameScoreBoardModalForSupabase(gameKey));
+   insertMissingScoresToSupabase(gameKey).then(()=>fetchSupabaseState()).then(remote=>{state.games[gameKey]=remote.games[gameKey];saveState();originalOpenGameScoreBoardModalForSupabase(gameKey);}).catch(()=>originalOpenGameScoreBoardModalForSupabase(gameKey));
  }else originalOpenGameScoreBoardModalForSupabase(gameKey);
 };
 if($('scoreBoardBtn'))$('scoreBoardBtn').onclick=()=>openGameScoreBoardModal('tetris');
