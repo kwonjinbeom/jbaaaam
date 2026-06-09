@@ -623,11 +623,11 @@ function toggleGitEnabled(){
    loadFromGithub({manual:false});
    showToast("GitHub 모드");
  }else{
-   // localStorage 모드는 GitHub 저장소와 분리된 local 전용 저장소를 화면에 로드
+   // Supabase 공유 저장 고정는 GitHub 저장소와 분리된 local 전용 저장소를 화면에 로드
    state=normalizeState(loadState());
-   lastSyncText="Supabase 사용 OFF · localStorage 모드";
+   lastSyncText="Supabase 공유 저장 고정";
    render();
-   showToast("localStorage 모드");
+   showToast("Supabase 공유 저장 고정");
  }
 }
 
@@ -693,16 +693,16 @@ async function loadFromGithub({manual=false}={}){
  }else{
    setGitEnabled(false);
    state=normalizeState(loadState());
-   lastSyncText=`GitHub 불러오기 실패 → localStorage 모드 전환 ${nowText()}`;
+   lastSyncText=`GitHub 불러오기 실패 → Supabase 공유 저장 고정 전환 ${nowText()}`;
    render();
-   showToast("GitHub 실패 · localStorage 모드","error");
+   showToast("GitHub 실패 · Supabase 공유 저장 고정","error");
  }
 }
 }
 
 function scheduleAutoSave(){
  if(isApplyingRemote)return;
- if(!isGitEnabled()){lastSyncText="localStorage 저장 완료";updateGithubStatus();return}
+ if(!isGitEnabled()){lastSyncText="Supabase 공유 저장 고정";updateGithubStatus();return}
  const s=getGithubSetting();if(!s.token||!s.autoSave)return;
  clearTimeout(autoSaveTimer);
  requestGithubSave({manual:false});
@@ -1508,7 +1508,7 @@ async function insertMissingScoresToSupabase(gameKey=null){
  return missing.length;
 }
 async function syncStateToSupabase({manual=false}={}){
- if(!isGitEnabled()){lastSyncText="localStorage 저장 완료";updateGithubStatus();return}
+ if(!isGitEnabled()){lastSyncText="Supabase 공유 저장 고정";updateGithubStatus();return}
  if(isSupabaseSaving){hasPendingSupabaseSave=true;lastSyncText="저장 중. 다음 저장 대기...";updateGithubStatus();return}
  isSupabaseSaving=true;
  try{
@@ -1535,7 +1535,7 @@ async function syncStateToSupabase({manual=false}={}){
   isApplyingRemote=true;state=normalizeState(latest);saveState();render();isApplyingRemote=false;
   lastSyncText=`Supabase 저장 완료 ${nowText()}`;lastGithubError="";updateGithubStatus();showToast(`Supabase 저장 완료 ${nowText()}`);
  }catch(e){
-  console.error(e);lastGithubError=shortErrorText(e);lastSyncText=`Supabase 저장 실패 · 로컬 저장 ${nowText()}`;updateGithubStatus();showToast("Supabase 연결이 제대로 안돼서 로컬에 저장했어","error");if(manual)alert("Supabase 저장 실패: "+lastGithubError+"\n로컬에는 저장했어.");
+  console.error(e);lastGithubError=shortErrorText(e);lastSyncText=`Supabase 저장 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 저장 실패 · 연결을 확인해줘","error");if(manual)alert("Supabase 저장 실패: "+lastGithubError);
  }finally{
   isSupabaseSaving=false;
   if(hasPendingSupabaseSave){hasPendingSupabaseSave=false;setTimeout(()=>requestGithubSave({manual:false}),80)}
@@ -1549,23 +1549,23 @@ openGithubModal=function(){
 };
 updateGithubStatus=function(){
  const enabled=isGitEnabled();if(gitEnabledToggle)gitEnabledToggle.checked=enabled;if(githubBox)githubBox.classList.toggle("git-off",!enabled);const errText=lastGithubError?`\n오류: ${lastGithubError}`:"";
- if(!enabled){githubStatus.textContent=`Supabase OFF\nlocalStorage 전용 데이터 사용 중\n${lastSyncText}${errText}`;return}
+ if(!enabled){githubStatus.textContent=`Supabase 공유 저장\n${lastSyncText}${errText}`;return}
  githubStatus.textContent=`Supabase 연결\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta\n${lastSyncText}${errText}`;
 };
-toggleGitEnabled=function(){saveState();setGitEnabled(gitEnabledToggle.checked);clearTimeout(autoSaveTimer);lastGithubError="";if(isGitEnabled()){state=normalizeState(loadState());lastSyncText="Supabase 사용 ON";render();loadFromGithub({manual:false});showToast("Supabase 모드")}else{state=normalizeState(loadState());lastSyncText="Supabase 사용 OFF · localStorage 모드";render();showToast("localStorage 모드")}};
+toggleGitEnabled=function(){saveState();setGitEnabled(gitEnabledToggle.checked);clearTimeout(autoSaveTimer);lastGithubError="";if(isGitEnabled()){state=normalizeState(loadState());lastSyncText="Supabase 사용 ON";render();loadFromGithub({manual:false});showToast("Supabase 모드")}else{state=normalizeState(loadState());lastSyncText="Supabase 공유 저장 고정";render();showToast("Supabase 공유 저장 고정")}};
 loadFromGithub=async function({manual=false}={}){
- if(!isGitEnabled()){if(manual)showToast("Supabase OFF 상태야");updateGithubStatus();return}
+ if(!isGitEnabled()){if(manual)showToast("Supabase 공유 저장 고정");updateGithubStatus();return}
  try{lastSyncText="Supabase 불러오는 중...";lastGithubError="";updateGithubStatus();await insertMissingScoresToSupabase().catch(()=>0);const remote=await fetchSupabaseState();isApplyingRemote=true;state=normalizeState(remote);saveState();render();isApplyingRemote=false;lastSyncText=`Supabase 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("Supabase 불러오기 완료.")}
  catch(e){console.error(e);isApplyingRemote=false;lastGithubError=shortErrorText(e);lastSyncText=`Supabase 불러오기 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 불러오기 실패","error");if(manual)alert("Supabase 불러오기 실패: "+lastGithubError)}
 };
 requestGithubSave=function({manual=false}={}){syncStateToSupabase({manual})};
 saveToGithub=async function({manual=false}={}){syncStateToSupabase({manual})};
 testGithubConnection=async function(){
- if(!isGitEnabled()){showToast("Supabase OFF 상태야");updateGithubStatus();return}
+ if(!isGitEnabled()){showToast("Supabase 공유 저장 고정");updateGithubStatus();return}
  try{lastGithubError="";lastSyncText="Supabase 연결 테스트 중...";updateGithubStatus();await sbFetch('/game_scores?select=id&limit=1');lastSyncText=`Supabase 연결 성공 ${nowText()}`;updateGithubStatus();showToast("Supabase 연결 성공")}
  catch(e){lastGithubError=shortErrorText(e);lastSyncText=`Supabase 연결 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 연결 실패","error");alert("Supabase 연결 실패: "+lastGithubError+"\n테이블/RLS SQL을 먼저 실행했는지 확인해줘.")}
 };
-scheduleAutoSave=function(){if(isApplyingRemote)return;if(!isGitEnabled()){lastSyncText="localStorage 저장 완료";updateGithubStatus();return}clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(()=>requestGithubSave({manual:false}),120)};
+scheduleAutoSave=function(){if(isApplyingRemote)return;if(!isGitEnabled()){lastSyncText="Supabase 공유 저장 고정";updateGithubStatus();return}clearTimeout(autoSaveTimer);autoSaveTimer=setTimeout(()=>requestGithubSave({manual:false}),120)};
 commitChange=function(){saveState();render();scheduleAutoSave()};
 const originalDeleteItemForSupabase=deleteItem;
 deleteItem=function(){const sheet=getCurrentSheet();if(editingItemId)addItemDelete(sheet.id,editingItemId);originalDeleteItemForSupabase()};
@@ -1573,7 +1573,7 @@ if(deleteItemBtn)deleteItemBtn.onclick=deleteItem;
 const originalDeleteSheetForSupabase=deleteSheet;
 deleteSheet=function(id){addSheetDelete(id);originalDeleteSheetForSupabase(id)};
 const originalSaveScoreRecordForSupabase=saveScoreRecord;
-saveScoreRecord=function(){originalSaveScoreRecordForSupabase();if(isGitEnabled())setTimeout(()=>insertMissingScoresToSupabase(pendingGameKey).then(()=>loadFromGithub({manual:false})).catch(e=>{lastGithubError=shortErrorText(e);lastSyncText=`스코어는 로컬 저장 · Supabase 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 연결이 제대로 안돼서 로컬에 저장했어","error")}),150)};
+saveScoreRecord=function(){originalSaveScoreRecordForSupabase();if(isGitEnabled())setTimeout(()=>insertMissingScoresToSupabase(pendingGameKey).then(()=>loadFromGithub({manual:false})).catch(e=>{lastGithubError=shortErrorText(e);lastSyncText=`스코어 저장 실패 · Supabase 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 저장 실패 · 연결을 확인해줘","error")}),150)};
 if($('saveScoreRecordBtn'))$('saveScoreRecordBtn').onclick=saveScoreRecord;
 const originalOpenGameScoreBoardModalForSupabase=openGameScoreBoardModal;
 openGameScoreBoardModal=function(gameKey="tetris"){
@@ -1600,3 +1600,44 @@ if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=tru
 saveState();
 render();
 setTimeout(()=>{updateGithubStatus();loadFromGithub({manual:false});},300);
+
+
+/* Supabase only mode: local data storage removed */
+let __sbItemDeleteMap = {};
+let __sbSheetDeletes = [];
+getDeleteMap=function(){return __sbItemDeleteMap || {}};
+saveDeleteMap=function(m){__sbItemDeleteMap=m||{}};
+getSheetDeletes=function(){return __sbSheetDeletes || []};
+saveSheetDeletes=function(arr){__sbSheetDeletes=[...(new Set(arr||[]))]};
+clearItemDeletesFor=function(sheetId){if(sheetId)delete __sbItemDeleteMap[sheetId];else __sbItemDeleteMap={}};
+clearSheetDeletes=function(){__sbSheetDeletes=[]};
+
+saveState=function(){};
+loadState=function(){return makeDefaultState()};
+isGitEnabled=function(){return true};
+setGitEnabled=function(){};
+
+toggleGitEnabled=function(){
+  if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=true;}
+  lastSyncText="Supabase 공유 저장 고정";
+  updateGithubStatus();
+  showToast("Supabase 공유 저장 고정");
+};
+updateGithubStatus=function(){
+ const errText=lastGithubError?`\n오류: ${lastGithubError}`:"";
+ if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=true;}
+ if(githubBox)githubBox.classList.remove("git-off");
+ githubStatus.textContent=`Supabase 공유 저장\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta\n${lastSyncText}${errText}`;
+};
+scheduleAutoSave=function(){
+ if(isApplyingRemote)return;
+ clearTimeout(autoSaveTimer);
+ autoSaveTimer=setTimeout(()=>requestGithubSave({manual:false}),120);
+};
+
+// 앱 시작 시 기존 기기 localStorage 데이터 대신 Supabase 기준 화면만 사용
+state=makeDefaultState();
+lastSyncText="Supabase 불러오기 대기";
+if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=true;}
+render();
+setTimeout(()=>{updateGithubStatus();loadFromGithub({manual:false});},100);

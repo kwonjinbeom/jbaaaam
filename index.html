@@ -199,8 +199,8 @@
     <div class="github-box" id="githubBox">
       <div class="toggle-row">
         <div>
-          <div class="toggle-label">Supabase 사용</div>
-          <div class="toggle-sub">OFF면 이 기기 localStorage만 사용</div>
+          <div class="toggle-label">Supabase 공유 저장</div>
+          <div class="toggle-sub">공용 DB 고정 사용</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="gitEnabledToggle">
@@ -208,8 +208,8 @@
         </label>
       </div>
       <div class="github-title">Supabase 공유 저장</div>
-      <div class="grid2"><button class="side-btn" id="loadGithubBtn">수동 불러오기</button><button class="side-btn primary" id="saveGithubBtn">수동 저장</button></div><button class="side-btn" id="testGithubBtn" style="width:100%;margin-top:8px;">연결 테스트</button>
-      <button class="side-btn" id="githubSettingBtn" style="width:100%;margin-top:8px;">Supabase 설정</button>
+      <div class="grid2"><button class="side-btn" id="loadGithubBtn">DB 불러오기</button><button class="side-btn primary" id="saveGithubBtn">DB 저장</button></div><button class="side-btn" id="testGithubBtn" style="width:100%;margin-top:8px;">연결 테스트</button>
+      <button class="side-btn" id="githubSettingBtn" style="width:100%;margin-top:8px;">Supabase 정보</button>
       <div class="github-status" id="githubStatus">상태 확인 중...</div>
     </div>
     <div class="sheet-list" id="sheetList"></div>
@@ -234,7 +234,7 @@
 </div></div></div>
 
 <div class="modal-backdrop" id="githubModalBackdrop"><div class="modal-wrap"><div class="modal">
-  <div class="modal-head"><div class="modal-title">Supabase 설정</div><button class="modal-close-btn" id="closeGithubModalBtn">×</button></div>
+  <div class="modal-head"><div class="modal-title">Supabase 정보</div><button class="modal-close-btn" id="closeGithubModalBtn">×</button></div>
   <div class="field"><label>Project URL</label><input class="input" id="ghOwnerInput" value="https://mnsxaulypjrnczearlyd.supabase.co"></div>
   <div class="field"><label>Project name</label><input class="input" id="ghRepoInput" value="jbaaaam"></div>
   <div class="field"><label>Schema</label><input class="input" id="ghBranchInput" value="public"></div>
@@ -282,6 +282,6 @@
 </div></div></div>
 
 
-<script src="js/app.js" defer></script>
+<script src="js/app.js?v=supabase-only-20260609-2" defer></script>
 </body>
 </html>
