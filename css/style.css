@@ -940,3 +940,24 @@ textarea.input{height:72px;resize:none;padding-top:12px;line-height:1.35}.input:
   .list-hero{align-items:stretch;flex-direction:column}
   .list-new-sheet-btn{width:100%}
 }
+
+/* 20260609-2: menu icon cleanup */
+.drawer-home-icon svg{
+  width:34px;
+  height:34px;
+  display:block;
+  fill:currentColor;
+}
+.drawer-menu-card.no-icon{
+  min-height:86px;
+  justify-content:center;
+}
+.drawer-menu-card.no-icon span{
+  display:block;
+}
+.drawer-menu-card.no-icon b{
+  font-size:18px;
+}
+.drawer-menu-card.no-icon em{
+  margin-top:5px;
+}

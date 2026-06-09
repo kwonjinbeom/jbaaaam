@@ -1591,6 +1591,16 @@ function mergeSheetForSupabase(remoteSheet,localSheet,deletedIds=[]){
  return {id:localSheet.id,name:localSheet.name||remoteSheet?.name||"예산표",items};
 }
 function collectLocalScores(){state=normalizeState(state);const arr=[];["tetris","dino","bamboo"].forEach(g=>{(state.games[g].records||[]).forEach(r=>{arr.push({game_key:g,name:String(r.name||"익명"),score:Number(r.score)||0,created_at:r.dt||new Date().toISOString()})})});return arr.filter(r=>r.score>0)}
+async function pruneSupabaseGameScores(gameKey=null){
+ const gameKeys=gameKey?[gameKey]:["tetris","dino","bamboo"];
+ for(const g of gameKeys){
+  const rows=await sbFetch(`/game_scores?select=id,score,created_at&game_key=eq.${encodeURIComponent(g)}&order=score.desc,created_at.asc&limit=1000`);
+  const extra=(rows||[]).slice(15).map(r=>r.id).filter(Boolean);
+  if(extra.length){
+   await sbFetch(`/game_scores?id=in.(${extra.map(encodeURIComponent).join(",")})`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
+  }
+ }
+}
 async function insertMissingScoresToSupabase(gameKey=null){
  const q=gameKey?`/game_scores?select=game_key,name,score&game_key=eq.${encodeURIComponent(gameKey)}&limit=1000`:'/game_scores?select=game_key,name,score&limit=1000';
  const existing=await sbFetch(q);
@@ -1599,6 +1609,7 @@ async function insertMissingScoresToSupabase(gameKey=null){
  const missing=[];
  local.forEach(r=>{const k=`${r.game_key}|${r.name}|${Number(r.score)||0}`;if(!keys.has(k)){keys.add(k);missing.push(r)}});
  if(missing.length)await sbFetch('/game_scores',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(missing)});
+ await pruneSupabaseGameScores(gameKey);
  return missing.length;
 }
 async function syncStateToSupabase({manual=false}={}){
