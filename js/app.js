@@ -49,7 +49,7 @@ function getActiveStorageKey(){
 
 function newId(){return crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random())}
 function loadState(){try{const s=JSON.parse(localStorage.getItem(getActiveStorageKey()));if(s&&s.sheets&&s.sheets.length)return s}catch{}const id=newId();return{version:EXPORT_VERSION,currentSheetId:id,sheets:[{id,name:"기본 예산표",items:[]}]}}
-function normalizeState(raw){if(!raw||!Array.isArray(raw.sheets)||!raw.sheets.length)raw=loadState();raw.version=EXPORT_VERSION;raw.sheets=raw.sheets.map((s,si)=>{const ns={id:s.id||newId(),name:s.name||`예산표 ${si+1}`,items:Array.isArray(s.items)?s.items:[]};ns.items=ns.items.map((it,i)=>({id:it.id||newId(),name:it.name||"이름 없음",amount:Number(it.amount)||0,type:it.type==="expense"?"expense":"income",day:it.day===""||it.day==null?"":Number(it.day),note:it.note||"",order:Number.isFinite(Number(it.order))?Number(it.order):i}));ns.items.sort((a,b)=>a.order-b.order).forEach((it,i)=>it.order=i);return ns});if(!raw.currentSheetId||!raw.sheets.some(s=>s.id===raw.currentSheetId))raw.currentSheetId=raw.sheets[0].id;if(!raw.games)raw.games={};if(!raw.games.tetris)raw.games.tetris={bestScore:0,records:[]};if(!raw.games.dino)raw.games.dino={bestScore:0,records:[]};if(!raw.games.bamboo)raw.games.bamboo={bestScore:0,records:[]};["tetris","dino","bamboo"].forEach(g=>{raw.games[g].bestScore=Number(raw.games[g].bestScore)||0;if(!Array.isArray(raw.games[g].records))raw.games[g].records=[];raw.games[g].records=raw.games[g].records.map(r=>({id:r.id||newId(),name:String(r.name||"익명"),score:Number(r.score)||0,dt:r.dt||""})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score).slice(0,50);});return raw}
+function normalizeState(raw){if(!raw||!Array.isArray(raw.sheets)||!raw.sheets.length)raw=loadState();raw.version=EXPORT_VERSION;raw.sheets=raw.sheets.map((s,si)=>{const ns={id:s.id||newId(),name:s.name||`예산표 ${si+1}`,items:Array.isArray(s.items)?s.items:[]};ns.items=ns.items.map((it,i)=>({id:it.id||newId(),name:it.name||"이름 없음",amount:Number(it.amount)||0,type:it.type==="expense"?"expense":"income",day:it.day===""||it.day==null?"":Number(it.day),note:it.note||"",order:Number.isFinite(Number(it.order))?Number(it.order):i}));ns.items.sort((a,b)=>a.order-b.order).forEach((it,i)=>it.order=i);return ns});if(!raw.currentSheetId||!raw.sheets.some(s=>s.id===raw.currentSheetId))raw.currentSheetId=raw.sheets[0].id;if(!raw.games)raw.games={};if(!raw.games.tetris)raw.games.tetris={bestScore:0,records:[]};if(!raw.games.dino)raw.games.dino={bestScore:0,records:[]};if(!raw.games.bamboo)raw.games.bamboo={bestScore:0,records:[]};["tetris","dino","bamboo"].forEach(g=>{raw.games[g].bestScore=Number(raw.games[g].bestScore)||0;if(!Array.isArray(raw.games[g].records))raw.games[g].records=[];raw.games[g].records=raw.games[g].records.map(r=>({id:r.id||newId(),name:String(r.name||"익명"),score:Number(r.score)||0,dt:r.dt||""})).filter(r=>r.score>0).sort((a,b)=>b.score-a.score).slice(0,15);});return raw}
 function saveState(){state=normalizeState(state);localStorage.setItem(getActiveStorageKey(),JSON.stringify(state))}
 function commitChange(){saveState();render();scheduleAutoSave()}
 function getCurrentSheet(){let s=state.sheets.find(x=>x.id===state.currentSheetId);if(!s){s=state.sheets[0];state.currentSheetId=s.id;saveState()}return s}
@@ -125,10 +125,26 @@ function getGameRecords(gameKey){
  state=normalizeState(state);
  return (state.games[gameKey]&&state.games[gameKey].records)||[];
 }
+function canSaveGameScore(score,gameKey="tetris"){
+ const records=getGameRecords(gameKey).slice().sort((a,b)=>Number(b.score)-Number(a.score));
+ const n=Number(score)||0;
+ if(n<=0)return false;
+ if(records.length<15)return true;
+ return n>Number(records[14].score||0);
+}
+function getScoreCutLine(gameKey="tetris"){
+ const records=getGameRecords(gameKey).slice().sort((a,b)=>Number(b.score)-Number(a.score));
+ return records.length>=15?Number(records[14].score||0):0;
+}
 function openScoreNameModal(score,gameKey="tetris"){
  pendingGameScore=Number(score)||0;
  pendingGameKey=gameKey;
  if(pendingGameScore<=0)return;
+ if(!canSaveGameScore(pendingGameScore,gameKey)){
+   const cut=getScoreCutLine(gameKey);
+   showToast(cut?`15위 안에 들어야 저장돼 · 기준 ${cut.toLocaleString()}점`:"15위 안에 들어야 저장돼","error");
+   return;
+ }
  $("scoreNameInput").value=localStorage.getItem("simple_budget_last_game_name")||localStorage.getItem("simple_budget_last_tetris_name")||"";
  $("scoreValueInput").value=String(pendingGameScore);
  const title=$("scoreNameModalBackdrop").querySelector(".modal-title");
@@ -149,7 +165,7 @@ function saveScoreRecord(){
  localStorage.setItem("simple_budget_last_tetris_name",name);
  state=normalizeState(state);
  state.games[gameKey].records.push({id:newId(),name,score,dt:new Date().toISOString()});
- state.games[gameKey].records=state.games[gameKey].records.sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,50);
+ state.games[gameKey].records=state.games[gameKey].records.sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,15);
  if(score>Number(state.games[gameKey].bestScore||0))state.games[gameKey].bestScore=score;
  closeScoreNameModal();
  commitChange();
@@ -181,7 +197,7 @@ function openScoreBoardModal(){openGameScoreBoardModal("tetris")}
 function closeScoreBoardModal(){$("scoreBoardModalBackdrop").classList.remove("open")}
 function renderScoreBoard(){
  const list=$("scoreList");
- const records=getGameRecords(scoreBoardGameKey);
+ const records=getGameRecords(scoreBoardGameKey).slice().sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,15);
  if(!records.length){
    list.innerHTML='<div class="score-empty">아직 저장된 스코어가 없어.</div>';
    return;
@@ -224,6 +240,8 @@ let tetrisRunning=false;
 let tetrisPaused=false;
 let tetrisLoopId=null;
 let tetrisDropMs=700;
+let tetrisLevel=1;
+let tetrisLastLevel=1;
 
 const TETRIS_SHAPES=[
  {name:"I",color:"#38bdf8",shape:[[1,1,1,1]]},
@@ -269,6 +287,9 @@ function resetTetrisBoard(){
  tetrisPiece=null;
  tetrisNextQueue=[randomTetrisPiece(),randomTetrisPiece(),randomTetrisPiece()];
  tetrisScoreValue=0;
+ tetrisLevel=1;
+ tetrisLastLevel=1;
+ tetrisDropMs=getTetrisDropMs(tetrisLevel);
  tetrisRunning=false;
  tetrisPaused=false;
  clearInterval(tetrisLoopId);
@@ -295,6 +316,39 @@ function spawnTetrisPiece(){
  if(collidesTetris(tetrisPiece.x,tetrisPiece.y,tetrisPiece.shape)){
    endTetris();
  }
+}
+
+function getTetrisLevel(score=tetrisScoreValue){
+ return Math.floor(Number(score||0)/5000)+1;
+}
+
+function getTetrisDropMs(level=getTetrisLevel()){
+ return Math.max(520,700-(Number(level||1)-1)*20);
+}
+
+function getTetrisScoreMultiplier(level=getTetrisLevel()){
+ return 1+(Number(level||1)-1)*0.15;
+}
+
+function refreshTetrisDifficulty(){
+ const nextLevel=getTetrisLevel();
+ tetrisLevel=nextLevel;
+ const nextDropMs=getTetrisDropMs(nextLevel);
+ if(nextLevel!==tetrisLastLevel||nextDropMs!==tetrisDropMs){
+   tetrisLastLevel=nextLevel;
+   tetrisDropMs=nextDropMs;
+   if(tetrisRunning){
+     clearInterval(tetrisLoopId);
+     tetrisLoopId=setInterval(tetrisTick,tetrisDropMs);
+   }
+ }
+}
+
+function addTetrisScore(baseScore){
+ const add=Math.max(0,Math.round(Number(baseScore||0)*getTetrisScoreMultiplier()));
+ if(add<=0)return;
+ tetrisScoreValue+=add;
+ refreshTetrisDifficulty();
 }
 
 function startTetris(){
@@ -350,7 +404,7 @@ function moveTetris(dx){
 function softDropTetris(){
  if(!tetrisRunning||tetrisPaused)return;
  if(tryMoveTetris(0,1)){
-   tetrisScoreValue+=1;
+   addTetrisScore(1);
    drawTetris();
  }else{
    tetrisTick();
@@ -361,7 +415,7 @@ function hardDropTetris(){
  if(!tetrisPiece||!tetrisRunning||tetrisPaused)return;
  let moved=0;
  while(tryMoveTetris(0,1))moved++;
- tetrisScoreValue+=moved*2;
+ addTetrisScore(moved*2);
  tetrisTick();
 }
 
@@ -407,7 +461,7 @@ function clearTetrisLines(){
  }
  if(cleared){
    const scoreMap=[0,100,300,500,800];
-   tetrisScoreValue+=scoreMap[cleared]||cleared*200;
+   addTetrisScore(scoreMap[cleared]||cleared*200);
  }
 }
 
@@ -428,8 +482,10 @@ function getTetrisBest(){
 }
 
 function updateTetrisInfo(){
+ refreshTetrisDifficulty();
  $("tetrisScore").textContent=String(tetrisScoreValue);
  $("tetrisBest").textContent=String(Math.max(getTetrisBest(),tetrisScoreValue));
+ if($("tetrisLevel"))$("tetrisLevel").textContent=String(tetrisLevel);
 }
 
 function drawCell(x,y,color){
@@ -868,8 +924,8 @@ let dinoGroundX=0;
 let dinoDuck=false;
 let dino={x:70,y:0,w:38,h:48,vy:0,onGround:true};
 const DINO_W=820;
-const DINO_H=320;
-const DINO_GROUND=255;
+const DINO_H=420;
+const DINO_GROUND=350;
 const DINO_GRAVITY=1900;
 const DINO_JUMP=-690;
 
@@ -909,7 +965,7 @@ function resetDino(){
  dinoScoreValue=0;
  dinoSpeed=1;
  dinoObstacles=[];
- dinoClouds=[{x:160,y:74,w:46},{x:450,y:50,w:62},{x:720,y:88,w:42}];
+ dinoClouds=[{x:160,y:104,w:46},{x:450,y:72,w:62},{x:720,y:132,w:42}];
  dinoGroundX=0;
  dinoDuck=false;
  dino={x:70,y:DINO_GROUND-48,w:38,h:48,vy:0,onGround:true};
@@ -939,7 +995,12 @@ function jumpDino(){
    dino.onGround=false;
  }
 }
-function setDinoDuck(flag){dinoDuck=!!flag}
+function setDinoDuck(flag){
+ dinoDuck=!!flag;
+ if(dinoDuck&&dinoRunning&&!dinoPaused&&!dino.onGround){
+   dino.vy=Math.max(dino.vy,980);
+ }
+}
 function spawnDinoObstacle(){
  const birdChance=Math.min(Math.max((dinoScoreValue-700)/2500,0),0.2);
  const isBird=dinoScoreValue>700&&Math.random()<birdChance;
@@ -967,7 +1028,7 @@ function updateDino(dt){
  dinoSpeed=1+Math.min(speedDifficulty/2200,1.25);
  const runSpeed=285*dinoSpeed;
  dinoGroundX=(dinoGroundX-runSpeed*dt)%34;
- dino.vy+=DINO_GRAVITY*dt;
+ dino.vy+=(DINO_GRAVITY+(dinoDuck&&!dino.onGround?2600:0))*dt;
  dino.y+=dino.vy*dt;
  dino.h=(dinoDuck&&dino.onGround)?30:48;
  dino.w=(dinoDuck&&dino.onGround)?52:38;
@@ -981,7 +1042,7 @@ function updateDino(dt){
    c.x-=28*dt*dinoSpeed;
    if(c.x<-80){
      c.x=DINO_W+Math.random()*160;
-     c.y=44+Math.random()*75;
+     c.y=58+Math.random()*130;
      c.w=38+Math.random()*30;
    }
  }
@@ -990,8 +1051,8 @@ function updateDino(dt){
  const lastObstacle=dinoObstacles[dinoObstacles.length-1];
  const speedGap=(dinoSpeed-1)*180;
  const scorePressure=Math.min(Math.max((dinoScoreValue-500)/2500,0),1)*70;
- const minGap=500+speedGap-scorePressure;
- const randomGap=250+(dinoSpeed-1)*80;
+ const minGap=465+speedGap-scorePressure;
+ const randomGap=220+(dinoSpeed-1)*70;
  const nextGap=minGap+Math.random()*randomGap;
  if(!lastObstacle||lastObstacle.x<DINO_W-nextGap)spawnDinoObstacle();
  for(const ob of dinoObstacles){
@@ -1048,15 +1109,15 @@ function drawDino(){
    ctx.fillStyle="rgba(17,24,39,.82)";
    ctx.font="900 22px Pretendard, sans-serif";
    ctx.textAlign="center";
-   ctx.fillText(dinoScoreValue>0?"GAME OVER":"START",DINO_W/2,122);
+   ctx.fillText(dinoScoreValue>0?"GAME OVER":"START",DINO_W/2,168);
    ctx.font="800 13px Pretendard, sans-serif";
-   ctx.fillText("점프 버튼 또는 ↑ / Space",DINO_W/2,148);
+   ctx.fillText("점프 버튼 또는 ↑ / Space",DINO_W/2,196);
  }
  if(dinoPaused){
    ctx.fillStyle="rgba(17,24,39,.82)";
    ctx.font="900 22px Pretendard, sans-serif";
    ctx.textAlign="center";
-   ctx.fillText("PAUSE",DINO_W/2,142);
+   ctx.fillText("PAUSE",DINO_W/2,198);
  }
  updateDinoInfo();
 }
@@ -1257,11 +1318,15 @@ function spawnBambooPattern(){
  const pattern=Math.random();
  const count=score<300?1:(score<900?(Math.random()<0.6?1:2):(Math.random()<0.5?2:3));
 
- if(score>1200&&pattern<0.22){
+ if(score>700&&pattern<0.20){
+   spawnBambooSideVolley();
+   return;
+ }
+ if(score>1200&&pattern<0.34){
    spawnBambooCross();
    return;
  }
- if(score>1800&&pattern<0.12){
+ if(score>1800&&pattern<0.14){
    spawnBambooDiagonalRain();
    return;
  }
@@ -1280,6 +1345,33 @@ function spawnBambooArrowFromSide(){
  else if(side===2){x=Math.random()*BAMBOO_W;y=-28}
  else{x=Math.random()*BAMBOO_W;y=BAMBOO_H+28}
  addBambooArrow(x,y,targetX,targetY);
+}
+
+function spawnBambooSideVolley(){
+ const side=Math.floor(Math.random()*4);
+ const margin=54;
+ const gap=78;
+ const offset=Math.random()*28;
+ const lanes=[];
+ if(side===0||side===1){
+   for(let y=margin+offset;y<=BAMBOO_H-margin;y+=gap)lanes.push(y);
+   const safe=Math.max(0,Math.min(lanes.length-1,Math.floor((bambooPlayer.y-margin-offset)/gap)));
+   lanes.forEach((y,i)=>{
+     if(i===safe&&Math.random()<0.72)return;
+     const x=side===0?-34:BAMBOO_W+34;
+     const tx=side===0?BAMBOO_W+20:-20;
+     addBambooArrow(x,y,tx,y+scoreNoise(10,4));
+   });
+ }else{
+   for(let x=margin+offset;x<=BAMBOO_W-margin;x+=gap)lanes.push(x);
+   const safe=Math.max(0,Math.min(lanes.length-1,Math.floor((bambooPlayer.x-margin-offset)/gap)));
+   lanes.forEach((x,i)=>{
+     if(i===safe&&Math.random()<0.72)return;
+     const y=side===2?-34:BAMBOO_H+34;
+     const ty=side===2?BAMBOO_H+20:-20;
+     addBambooArrow(x,y,x+scoreNoise(10,4),ty);
+   });
+ }
 }
 
 function scoreNoise(base,min){
@@ -1475,7 +1567,7 @@ function saveSheetDeletes(arr){localStorage.setItem(SB_SHEET_DELETES_KEY,JSON.st
 function addSheetDelete(sheetId){if(!sheetId)return;const arr=getSheetDeletes();if(!arr.includes(sheetId))arr.push(sheetId);saveSheetDeletes(arr)}
 function clearSheetDeletes(){saveSheetDeletes([])}
 function makeDefaultState(){const id=newId();return normalizeState({version:EXPORT_VERSION,currentSheetId:id,sheets:[{id,name:"기본 예산표",items:[]}],games:{tetris:{bestScore:0,records:[]},dino:{bestScore:0,records:[]},bamboo:{bestScore:0,records:[]}}})}
-function scoreRowsToGames(rows){const games={tetris:{bestScore:0,records:[]},dino:{bestScore:0,records:[]},bamboo:{bestScore:0,records:[]}};(rows||[]).forEach(r=>{const g=["tetris","dino","bamboo"].includes(r.game_key)?r.game_key:"tetris";const rec={id:r.id||newId(),name:String(r.name||"익명"),score:Number(r.score)||0,dt:r.created_at||new Date().toISOString()};if(rec.score>0)games[g].records.push(rec)});Object.keys(games).forEach(g=>{games[g].records.sort((a,b)=>b.score-a.score);games[g].records=games[g].records.slice(0,50);games[g].bestScore=games[g].records[0]?Number(games[g].records[0].score)||0:0});return games}
+function scoreRowsToGames(rows){const games={tetris:{bestScore:0,records:[]},dino:{bestScore:0,records:[]},bamboo:{bestScore:0,records:[]}};(rows||[]).forEach(r=>{const g=["tetris","dino","bamboo"].includes(r.game_key)?r.game_key:"tetris";const rec={id:r.id||newId(),name:String(r.name||"익명"),score:Number(r.score)||0,dt:r.created_at||new Date().toISOString()};if(rec.score>0)games[g].records.push(rec)});Object.keys(games).forEach(g=>{games[g].records.sort((a,b)=>b.score-a.score);games[g].records=games[g].records.slice(0,15);games[g].bestScore=games[g].records[0]?Number(games[g].records[0].score)||0:0});return games}
 async function fetchSupabaseState(){
  const [sheets,meta,scores]=await Promise.all([
   sbFetch('/budget_sheets?select=id,name,items,updated_at&order=updated_at.desc'),
@@ -1499,6 +1591,20 @@ function mergeSheetForSupabase(remoteSheet,localSheet,deletedIds=[]){
  return {id:localSheet.id,name:localSheet.name||remoteSheet?.name||"예산표",items};
 }
 function collectLocalScores(){state=normalizeState(state);const arr=[];["tetris","dino","bamboo"].forEach(g=>{(state.games[g].records||[]).forEach(r=>{arr.push({game_key:g,name:String(r.name||"익명"),score:Number(r.score)||0,created_at:r.dt||new Date().toISOString()})})});return arr.filter(r=>r.score>0)}
+
+async function pruneScoresToTop15(gameKey=null){
+ const games=gameKey?[gameKey]:["tetris","dino","bamboo"];
+ let deleted=0;
+ for(const g of games){
+   const rows=await sbFetch(`/game_scores?select=id,score,created_at&game_key=eq.${encodeURIComponent(g)}&order=score.desc,created_at.asc&limit=1000`);
+   const extra=(rows||[]).slice(15).filter(r=>r&&r.id);
+   for(const r of extra){
+     await sbFetch(`/game_scores?id=eq.${encodeURIComponent(r.id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
+     deleted++;
+   }
+ }
+ return deleted;
+}
 async function insertMissingScoresToSupabase(gameKey=null){
  const q=gameKey?`/game_scores?select=game_key,name,score&game_key=eq.${encodeURIComponent(gameKey)}&limit=1000`:'/game_scores?select=game_key,name,score&limit=1000';
  const existing=await sbFetch(q);
@@ -1507,6 +1613,7 @@ async function insertMissingScoresToSupabase(gameKey=null){
  const missing=[];
  local.forEach(r=>{const k=`${r.game_key}|${r.name}|${Number(r.score)||0}`;if(!keys.has(k)){keys.add(k);missing.push(r)}});
  if(missing.length)await sbFetch('/game_scores',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify(missing)});
+ await pruneScoresToTop15(gameKey);
  return missing.length;
 }
 async function syncStateToSupabase({manual=false}={}){
@@ -1532,6 +1639,7 @@ async function syncStateToSupabase({manual=false}={}){
   const currentId=mergedSheets.some(s=>s.id===state.currentSheetId)?state.currentSheetId:(mergedSheets[0]?.id||state.currentSheetId);
   await sbFetch('/app_meta?on_conflict=key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{key:'current_sheet_id',value:{id:currentId},updated_at:new Date().toISOString()}])});
   await insertMissingScoresToSupabase();
+  await pruneScoresToTop15();
   clearSheetDeletes();clearItemDeletesFor();
   const latest=await fetchSupabaseState();
   isApplyingRemote=true;state=normalizeState(latest);saveState();render();isApplyingRemote=false;
@@ -1557,7 +1665,7 @@ updateGithubStatus=function(){
 toggleGitEnabled=function(){saveState();setGitEnabled(gitEnabledToggle.checked);clearTimeout(autoSaveTimer);lastGithubError="";if(isGitEnabled()){state=normalizeState(loadState());lastSyncText="Supabase 사용 ON";render();loadFromGithub({manual:false});showToast("Supabase 모드")}else{state=normalizeState(loadState());lastSyncText="Supabase 공유 저장 고정";render();showToast("Supabase 공유 저장 고정")}};
 loadFromGithub=async function({manual=false}={}){
  if(!isGitEnabled()){if(manual)showToast("Supabase 공유 저장 고정");updateGithubStatus();return}
- try{lastSyncText="Supabase 불러오는 중...";lastGithubError="";updateGithubStatus();await insertMissingScoresToSupabase().catch(()=>0);const remote=await fetchSupabaseState();isApplyingRemote=true;state=normalizeState(remote);saveState();render();isApplyingRemote=false;lastSyncText=`Supabase 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("Supabase 불러오기 완료.")}
+ try{lastSyncText="Supabase 불러오는 중...";lastGithubError="";updateGithubStatus();await insertMissingScoresToSupabase().catch(()=>0);await pruneScoresToTop15().catch(()=>0);const remote=await fetchSupabaseState();isApplyingRemote=true;state=normalizeState(remote);saveState();render();isApplyingRemote=false;lastSyncText=`Supabase 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("Supabase 불러오기 완료.")}
  catch(e){console.error(e);isApplyingRemote=false;lastGithubError=shortErrorText(e);lastSyncText=`Supabase 불러오기 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 불러오기 실패","error");if(manual)alert("Supabase 불러오기 실패: "+lastGithubError)}
 };
 requestGithubSave=function({manual=false}={}){syncStateToSupabase({manual})};
@@ -1580,7 +1688,7 @@ if($('saveScoreRecordBtn'))$('saveScoreRecordBtn').onclick=saveScoreRecord;
 const originalOpenGameScoreBoardModalForSupabase=openGameScoreBoardModal;
 openGameScoreBoardModal=function(gameKey="tetris"){
  if(isGitEnabled()){
-   insertMissingScoresToSupabase(gameKey).then(()=>fetchSupabaseState()).then(remote=>{state.games[gameKey]=remote.games[gameKey];saveState();originalOpenGameScoreBoardModalForSupabase(gameKey);}).catch(()=>originalOpenGameScoreBoardModalForSupabase(gameKey));
+   insertMissingScoresToSupabase(gameKey).then(()=>pruneScoresToTop15(gameKey)).then(()=>fetchSupabaseState()).then(remote=>{state.games[gameKey]=remote.games[gameKey];saveState();originalOpenGameScoreBoardModalForSupabase(gameKey);}).catch(()=>originalOpenGameScoreBoardModalForSupabase(gameKey));
  }else originalOpenGameScoreBoardModalForSupabase(gameKey);
 };
 if($('scoreBoardBtn'))$('scoreBoardBtn').onclick=()=>openGameScoreBoardModal('tetris');

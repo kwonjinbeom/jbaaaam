@@ -42,25 +42,6 @@
       </button>
     </section>
   </div>
-  <div id="budgetListView" class="view-page budget-list-page">
-    <div class="header">
-      <button class="menu-btn" id="menuBtnBudgetList">☰</button>
-      <div class="title-area">
-        <div class="title">가계부</div>
-        <div class="subtitle">지출표를 선택하면 가계부 화면으로 이동해.</div>
-      </div>
-    </div>
-
-    <section class="budget-list-hero">
-      <div>
-        <div class="budget-list-title">지출표 목록</div>
-        <div class="budget-list-sub">같이 볼 지출표를 선택해줘.</div>
-      </div>
-      <button class="new-sheet-btn" id="newSheetBtn">+ 새 지출표</button>
-    </section>
-    <div class="sheet-list budget-sheet-list" id="sheetList"></div>
-  </div>
-
   <div id="budgetView" class="view-page">
 
   <div class="header">
@@ -103,6 +84,7 @@
           <div class="tetris-score-box">
             <div class="tetris-score-row"><span>점수</span><span id="tetrisScore">0</span></div>
             <div class="tetris-score-row"><span>최고</span><span id="tetrisBest">0</span></div>
+            <div class="tetris-score-row"><span>난이도</span><span id="tetrisLevel">1</span></div>
           </div>
           <div>
             <div class="next-title">다음 3개</div>
@@ -150,7 +132,7 @@
           <div class="dino-score-row"><span>최고</span><span id="dinoBest">0</span></div>
           <div class="dino-score-row"><span>속도</span><span id="dinoSpeed">1.0x</span></div>
         </div>
-        <canvas id="dinoCanvas" width="820" height="320"></canvas>
+        <canvas id="dinoCanvas" width="820" height="420"></canvas>
       </div>
 
       <div class="dino-controls">
@@ -200,69 +182,38 @@
     </div>
   </div>
 
-
-  <div id="guestbookView" class="view-page guestbook-page">
-    <div class="header">
-      <button class="menu-btn" id="menuBtnGuestbook">☰</button>
-      <div class="title-area">
-        <div class="title">방명록</div>
-        <div class="subtitle">남긴 글은 수정/삭제 없이 최신순으로 보여.</div>
-      </div>
-    </div>
-    <section class="guestbook-panel">
-      <div class="section-title-row" style="margin-top:0"><div class="section-title">게시판 리스트</div><button class="side-btn" id="guestbookRefreshBtn" style="width:auto;padding:0 14px">새로고침</button></div>
-      <div class="guestbook-list" id="guestbookList"><div class="empty">방명록을 불러오는 중...</div></div>
-    </section>
-  </div>
-
 </main>
 <button class="fab" id="addBtn" style="display:none">+ 추가</button>
 
 <div class="drawer-backdrop" id="drawerBackdrop">
   <aside class="drawer">
-    <div class="drawer-head">
-      <button class="drawer-title drawer-title-btn" id="drawerHomeBtn">메뉴 목록</button>
-      <button class="drawer-close" id="drawerCloseBtn">×</button>
-    </div>
-    <div class="grid2 drawer-menu-grid" style="grid-template-columns:1fr 1fr">
+    <div class="drawer-head"><div class="drawer-title">지출표 목록</div><button class="drawer-close" id="drawerCloseBtn">×</button></div>
+    <div class="grid2" style="grid-template-columns:1fr 1fr">
       <button class="menu-section-btn" id="showBudgetBtn">가계부</button>
       <button class="menu-section-btn" id="showTetrisBtn">테트리스</button>
       <button class="menu-section-btn" id="showDinoBtn">공룡게임</button>
       <button class="menu-section-btn" id="showBambooBtn">죽림고수</button>
     </div>
-    <div class="menu-divider"></div>
-
-    <section class="guest-mini-box">
-      <div class="guest-mini-head">
-        <div>
-          <div class="guest-mini-title">방명록</div>
-          <div class="guest-mini-sub">짧게 남겨줘</div>
-        </div>
-        <button class="guest-more-btn" id="guestMoreBtn">더보기</button>
-      </div>
-      <input class="input guest-mini-input" id="guestNameInput" maxlength="20" placeholder="이름">
-      <textarea class="input guest-mini-text" id="guestContentInput" maxlength="120" placeholder="내용"></textarea>
-      <button class="side-btn primary guest-send-btn" id="guestSendBtn">남기기</button>
-      <div class="guest-mini-status" id="guestMiniStatus"></div>
-    </section>
-
-    <div class="drawer-spacer"></div>
-
+    <button class="new-sheet-btn" id="newSheetBtn">+ 새 지출표 만들기</button>
+    <div class="grid2"><button class="side-btn" id="exportBtn">내보내기</button><button class="side-btn" id="importBtn">가져오기</button></div>
     <input class="hidden-file" id="importFileInput" type="file" accept=".json,application/json" />
-    <div style="display:none">
-      <button id="exportBtn"></button>
-      <button id="importBtn"></button>
-      <button id="loadGithubBtn"></button>
-      <button id="saveGithubBtn"></button>
-      <button id="testGithubBtn"></button>
-      <button id="githubSettingBtn"></button>
-      <input type="checkbox" id="gitEnabledToggle">
-    </div>
-
-    <div class="github-box drawer-bottom" id="githubBox">
+    <div class="github-box" id="githubBox">
+      <div class="toggle-row">
+        <div>
+          <div class="toggle-label">Supabase 사용</div>
+          <div class="toggle-sub">OFF면 이 기기 localStorage만 사용</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="gitEnabledToggle">
+          <span class="slider"></span>
+        </label>
+      </div>
       <div class="github-title">Supabase 공유 저장</div>
+      <div class="grid2"><button class="side-btn" id="loadGithubBtn">수동 불러오기</button><button class="side-btn primary" id="saveGithubBtn">수동 저장</button></div><button class="side-btn" id="testGithubBtn" style="width:100%;margin-top:8px;">연결 테스트</button>
+      <button class="side-btn" id="githubSettingBtn" style="width:100%;margin-top:8px;">Supabase 설정</button>
       <div class="github-status" id="githubStatus">상태 확인 중...</div>
     </div>
+    <div class="sheet-list" id="sheetList"></div>
   </aside>
 </div>
 
@@ -284,7 +235,7 @@
 </div></div></div>
 
 <div class="modal-backdrop" id="githubModalBackdrop"><div class="modal-wrap"><div class="modal">
-  <div class="modal-head"><div class="modal-title">Supabase 정보</div><button class="modal-close-btn" id="closeGithubModalBtn">×</button></div>
+  <div class="modal-head"><div class="modal-title">Supabase 설정</div><button class="modal-close-btn" id="closeGithubModalBtn">×</button></div>
   <div class="field"><label>Project URL</label><input class="input" id="ghOwnerInput" value="https://mnsxaulypjrnczearlyd.supabase.co"></div>
   <div class="field"><label>Project name</label><input class="input" id="ghRepoInput" value="jbaaaam"></div>
   <div class="field"><label>Schema</label><input class="input" id="ghBranchInput" value="public"></div>
@@ -326,12 +277,12 @@
   </div>
   <div class="score-list" id="scoreList"></div>
   <div class="modal-actions">
-    <button class="danger" id="clearScoreBoardBtn" style="display:none">전체삭제</button>
+    <button class="danger" id="clearScoreBoardBtn">전체삭제</button>
     <button class="primary" id="okScoreBoardBtn">확인</button>
   </div>
 </div></div></div>
 
 
-<script src="js/app.js?v=supabase-menu-guestbook-table-20260609-1" defer></script>
+<script src="js/app.js?v=supabase-only-20260609-10" defer></script>
 </body>
 </html>
