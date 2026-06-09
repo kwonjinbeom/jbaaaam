@@ -1,0 +1,15 @@
+{
+  "app": "simple_budget_sheets",
+  "version": 4,
+  "state": {
+    "version": 4,
+    "currentSheetId": "default",
+    "sheets": [
+      {
+        "id": "default",
+        "name": "기본 예산표",
+        "items": []
+      }
+    ]
+  }
+}
