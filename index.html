@@ -197,7 +197,7 @@
     <div class="grid2"><button class="side-btn" id="exportBtn">내보내기</button><button class="side-btn" id="importBtn">가져오기</button></div>
     <input class="hidden-file" id="importFileInput" type="file" accept=".json,application/json" />
     <div class="github-box" id="githubBox">
-      <div class="toggle-row">
+      <div class="toggle-row" style="display:none">
         <div>
           <div class="toggle-label">Supabase 공유 저장</div>
           <div class="toggle-sub">공용 DB 고정 사용</div>
@@ -209,7 +209,7 @@
       </div>
       <div class="github-title">Supabase 공유 저장</div>
       <div class="grid2"><button class="side-btn" id="loadGithubBtn">DB 불러오기</button><button class="side-btn primary" id="saveGithubBtn">DB 저장</button></div><button class="side-btn" id="testGithubBtn" style="width:100%;margin-top:8px;">연결 테스트</button>
-      <button class="side-btn" id="githubSettingBtn" style="width:100%;margin-top:8px;">Supabase 정보</button>
+      <button class="side-btn" id="githubSettingBtn" style="width:100%;margin-top:8px;display:none">Supabase 정보</button>
       <div class="github-status" id="githubStatus">상태 확인 중...</div>
     </div>
     <div class="sheet-list" id="sheetList"></div>
@@ -276,12 +276,12 @@
   </div>
   <div class="score-list" id="scoreList"></div>
   <div class="modal-actions">
-    <button class="danger" id="clearScoreBoardBtn">전체삭제</button>
+    <button class="danger" id="clearScoreBoardBtn" style="display:none">전체삭제</button>
     <button class="primary" id="okScoreBoardBtn">확인</button>
   </div>
 </div></div></div>
 
 
-<script src="js/app.js?v=supabase-only-20260609-3" defer></script>
+<script src="js/app.js?v=supabase-only-20260609-4" defer></script>
 </body>
 </html>
