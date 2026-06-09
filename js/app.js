@@ -1,3 +1,4 @@
+const APP_SCOPE=(location.pathname.split("/").filter(Boolean)[0]||"jbaaaam");
 const STORAGE_KEY="simple_budget_sheets_v2";
 const LOCAL_STORAGE_KEY="simple_budget_sheets_local_only_v1";
 const GH_KEY="simple_budget_github_setting_v1";
