@@ -831,11 +831,13 @@ textarea.input{height:72px;resize:none;padding-top:12px;line-height:1.35}.input:
 
 
 <script>
-const STORAGE_KEY="simple_budget_sheets_v2";
-const LOCAL_STORAGE_KEY="simple_budget_sheets_local_only_v1";
-const GH_KEY="simple_budget_github_setting_v1";
-const GIT_ENABLED_KEY="simple_budget_git_enabled_v1";
-const SUMMARY_COLLAPSED_KEY="simple_budget_summary_collapsed_v1";
+const APP_SCOPE=(location.pathname.split("/").filter(Boolean)[0]||"root").replace(/[^a-zA-Z0-9_-]/g,"_");
+const DEFAULT_GITHUB_REPO=APP_SCOPE==="root"?"budget_manage":APP_SCOPE;
+const STORAGE_KEY=`simple_budget_sheets_v2_${APP_SCOPE}`;
+const LOCAL_STORAGE_KEY=`simple_budget_sheets_local_only_v1_${APP_SCOPE}`;
+const GH_KEY=`simple_budget_github_setting_v1_${APP_SCOPE}`;
+const GIT_ENABLED_KEY=`simple_budget_git_enabled_v1_${APP_SCOPE}`;
+const SUMMARY_COLLAPSED_KEY=`simple_budget_summary_collapsed_v1_${APP_SCOPE}`;
 const EXPORT_VERSION=10;
 const DATA_CRYPT_KEY="jb";
 const AUTOSAVE_DELAY=0;
@@ -888,6 +890,7 @@ function getCurrentSheet(){let s=state.sheets.find(x=>x.id===state.currentSheetI
 function money(v){return Number(v||0).toLocaleString("ko-KR")+"원"}
 function dayText(d){const n=Number(d);return n?`${n}일`:"일자없음"}
 function esc(t){return String(t).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
+function escapeHtml(t){return esc(t)}
 function nowText(){const d=new Date();return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`}
 
 
@@ -1146,11 +1149,17 @@ function toggleTetrisPause(){
 function tetrisTick(){
  if(!tetrisRunning||tetrisPaused)return;
  if(!tryMoveTetris(0,1)){
-   lockTetrisPiece();
-   clearTetrisLines();
-   spawnTetrisPiece();
+   settleTetrisPiece();
  }
  drawTetris();
+}
+
+function settleTetrisPiece(){
+ if(!tetrisPiece||!tetrisRunning)return;
+ lockTetrisPiece();
+ tetrisPiece=null;
+ clearTetrisLines();
+ spawnTetrisPiece();
 }
 
 function collidesTetris(x,y,shape){
@@ -1184,7 +1193,8 @@ function softDropTetris(){
    tetrisScoreValue+=1;
    drawTetris();
  }else{
-   tetrisTick();
+   settleTetrisPiece();
+   drawTetris();
  }
 }
 
@@ -1193,7 +1203,8 @@ function hardDropTetris(){
  let moved=0;
  while(tryMoveTetris(0,1))moved++;
  tetrisScoreValue+=moved*2;
- tetrisTick();
+ settleTetrisPiece();
+ drawTetris();
 }
 
 function rotateMatrix(matrix){
@@ -1464,8 +1475,8 @@ function toggleGitEnabled(){
  }
 }
 
-function getGithubSetting(){try{return{owner:"kwonjinbeom",repo:"budget_manage",branch:"main",path:"data.json",token:"",autoLoad:true,autoSave:true,...JSON.parse(localStorage.getItem(GH_KEY)||"{}")}}catch{return{owner:"kwonjinbeom",repo:"budget_manage",branch:"main",path:"data.json",token:"",autoLoad:true,autoSave:true}}}
-function saveGithubSetting(){const s={owner:$("ghOwnerInput").value.trim(),repo:$("ghRepoInput").value.trim(),branch:$("ghBranchInput").value.trim()||"main",path:$("ghPathInput").value.trim()||"data.json",token:$("ghTokenInput").value.trim(),autoLoad:true,autoSave:true};if(!s.owner||!s.repo||!s.token){alert("Owner, Repo, Token은 필요해.");return}localStorage.setItem(GH_KEY,JSON.stringify(s));closeGithubModal();render();if(isGitEnabled())loadFromGithub({manual:false});alert("GitHub 설정 저장 완료.")}
+function getGithubSetting(){try{return{owner:"kwonjinbeom",repo:DEFAULT_GITHUB_REPO,branch:"main",path:"data.json",token:"",autoLoad:true,autoSave:true,...JSON.parse(localStorage.getItem(GH_KEY)||"{}")}}catch{return{owner:"kwonjinbeom",repo:DEFAULT_GITHUB_REPO,branch:"main",path:"data.json",token:"",autoLoad:true,autoSave:true}}}
+function saveGithubSetting(){const s={owner:$("ghOwnerInput").value.trim(),repo:$("ghRepoInput").value.trim(),branch:$("ghBranchInput").value.trim()||"main",path:$("ghPathInput").value.trim()||"data.json",token:$("ghTokenInput").value.trim(),autoLoad:true,autoSave:true};if(!s.owner||!s.repo||!s.token){alert("Owner, Repo, Token은 필요해.");return}localStorage.setItem(GH_KEY,JSON.stringify(s));lastGithubSha="";lastGithubError="";closeGithubModal();render();if(isGitEnabled())loadFromGithub({manual:false});alert("GitHub 설정 저장 완료.")}
 function openGithubModal(){const s=getGithubSetting();$("ghOwnerInput").value=s.owner;$("ghRepoInput").value=s.repo;$("ghBranchInput").value=s.branch;$("ghPathInput").value=s.path;$("ghTokenInput").value=s.token;githubModalBackdrop.classList.add("open")}
 function closeGithubModal(){githubModalBackdrop.classList.remove("open")}
 function updateGithubStatus(){
@@ -1514,7 +1525,7 @@ async function loadFromGithub({manual=false}={}){
  try{lastSyncText="GitHub 불러오는 중...";updateGithubStatus();const file=await getGithubFile(s);if(!file){lastSyncText="data.json 없음. 저장하면 생성됨";updateGithubStatus();if(manual)alert("data.json 파일이 아직 없어. 현재 데이터를 GitHub에 먼저 저장하면 생성돼.");return}
  const parsed=JSON.parse(decodeBase64Utf8(file.content));const imported=decryptBudgetPayload(parsed);if(!imported||!Array.isArray(imported.sheets))throw new Error("invalid data");
  if(manual&&!confirm("GitHub의 data.json 내용으로 현재 화면 데이터가 바뀌어. 계속할까?")){lastSyncText="수동 불러오기 취소";updateGithubStatus();return}
- isApplyingRemote=true;state=normalizeState(imported);lastGithubSha=file.sha;saveState();render();isApplyingRemote=false;lastSyncText=`GitHub 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("GitHub 불러오기 완료.")
+ isApplyingRemote=true;state=normalizeState(imported);lastGithubSha=file.sha;lastGithubError="";saveState();render();isApplyingRemote=false;lastSyncText=`GitHub 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("GitHub 불러오기 완료.")
  }catch(e){
  console.error(e);
  isApplyingRemote=false;
@@ -1615,7 +1626,7 @@ async function saveToGithub({manual=false}={}){
    for(let attempt=1; attempt<=3; attempt++){
      try{
        const file=await getGithubFile(s);
-       if(!lastGithubSha && file && file.sha) lastGithubSha=file.sha;
+       const freshSha=file&&file.sha?file.sha:"";
 
        const body={
          message:manual?"manual update budget data":"auto update budget data",
@@ -1623,7 +1634,7 @@ async function saveToGithub({manual=false}={}){
          branch:s.branch
        };
 
-       if(lastGithubSha)body.sha=lastGithubSha; else if(file&&file.sha)body.sha=file.sha;
+       if(freshSha)body.sha=freshSha;
 
        const pathParts=s.path.split("/").map(encodeURIComponent).join("/");
        const url=`https://api.github.com/repos/${encodeURIComponent(s.owner)}/${encodeURIComponent(s.repo)}/contents/${pathParts}`;
