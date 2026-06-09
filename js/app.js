@@ -7,6 +7,7 @@ const SUMMARY_COLLAPSED_KEY="simple_budget_summary_collapsed_v1";
 const EXPORT_VERSION=10;
 const DATA_CRYPT_KEY="jb";
 const AUTOSAVE_DELAY=0;
+const TETRIS_HINT_KEY="jbaaaam_tetris_hint_enabled_v1";
 
 let state=normalizeState(loadState());
 let editingItemId=null, selectedType="income", sheetMode="rename", editingSheetId=null;
@@ -241,6 +242,7 @@ let tetrisLoopId=null;
 let tetrisDropMs=700;
 let tetrisLevel=1;
 let tetrisLastLevel=1;
+let tetrisHintEnabled=localStorage.getItem(TETRIS_HINT_KEY)!=="N";
 
 const TETRIS_SHAPES=[
  {name:"I",color:"#38bdf8",shape:[[1,1,1,1]]},
@@ -264,6 +266,14 @@ function initTetrisIfNeeded(){
  $("tetrisRotateBtn").onclick=rotateTetrisPiece;
  $("tetrisDownBtn").onclick=softDropTetris;
  $("tetrisDropBtn").onclick=hardDropTetris;
+ if($("tetrisHintToggle")){
+   $("tetrisHintToggle").checked=tetrisHintEnabled;
+   $("tetrisHintToggle").onchange=()=>{
+     tetrisHintEnabled=$("tetrisHintToggle").checked;
+     localStorage.setItem(TETRIS_HINT_KEY,tetrisHintEnabled?"Y":"N");
+     drawTetris();
+   };
+ }
  document.addEventListener("keydown",handleTetrisKey);
  resetTetrisBoard();
  drawTetris();
@@ -451,6 +461,10 @@ function lockTetrisPiece(){
    }
  }
  addTetrisScore(10);
+ if(!tetrisHintEnabled){
+   tetrisScoreValue+=1;
+   refreshTetrisDifficulty();
+ }
 }
 
 function clearTetrisLines(){
@@ -581,7 +595,7 @@ function drawTetris(){
  }
 
  if(tetrisPiece){
-   drawTetrisGhost();
+   if(tetrisHintEnabled)drawTetrisGhost();
    for(let r=0;r<tetrisPiece.shape.length;r++){
      for(let c=0;c<tetrisPiece.shape[r].length;c++){
        if(tetrisPiece.shape[r][c])drawCell(tetrisPiece.x+c,tetrisPiece.y+r,tetrisPiece.color);

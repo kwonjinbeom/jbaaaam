@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#111827" />
 <title>Google - in chuck</title>
 <link rel="icon" href="https://github.githubassets.com/favicons/favicon.svg" type="image/svg+xml" />
-<link rel="stylesheet" href="css/style.css?v=guest-date-right-20260609-2" />
+<link rel="stylesheet" href="css/style.css?v=tetris-hint-toggle-20260609-1" />
 </head>
 <body>
 <main class="app">
@@ -71,6 +71,7 @@
         <div class="title">방명록</div>
         <div class="subtitle">남긴 글을 최신순으로 볼 수 있어</div>
       </div>
+      <button class="score-btn" id="guestbookRefreshBtn">새로고침</button>
     </div>
     <section class="guestbook-list" id="guestbookList"></section>
   </div>
@@ -106,6 +107,17 @@
         <button id="tetrisStartBtn">시작</button>
         <button id="tetrisPauseBtn">일시정지</button>
         <button id="tetrisRestartBtn">다시시작</button>
+      </div>
+
+      <div class="tetris-hint-row">
+        <div>
+          <div class="tetris-hint-title">착지 힌트</div>
+          <div class="tetris-hint-desc">OFF로 하면 블록을 놓을 때 +1점</div>
+        </div>
+        <label class="switch tetris-hint-switch">
+          <input type="checkbox" id="tetrisHintToggle" checked>
+          <span class="slider"></span>
+        </label>
       </div>
 
       <div class="tetris-stage">
@@ -350,6 +362,6 @@
 </div></div></div>
 
 
-<script src="js/app.js?v=guest-date-right-20260609-2" defer></script>
+<script src="js/app.js?v=tetris-hint-toggle-20260609-1" defer></script>
 </body>
 </html>

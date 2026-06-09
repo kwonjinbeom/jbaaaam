@@ -1130,3 +1130,18 @@ textarea.input{height:72px;resize:none;padding-top:12px;line-height:1.35}.input:
   text-align:right !important;
   white-space:nowrap !important;
 }
+
+.tetris-hint-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:16px;
+  padding:11px 12px;
+  box-shadow:0 2px 8px rgba(15,23,42,.04);
+}
+.tetris-hint-title{font-size:14px;font-weight:950;color:#111827}
+.tetris-hint-desc{margin-top:2px;font-size:11px;font-weight:800;color:#6b7280;line-height:1.35}
+.tetris-hint-switch{margin-left:auto}
