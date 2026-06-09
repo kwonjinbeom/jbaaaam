@@ -224,6 +224,8 @@ let tetrisRunning=false;
 let tetrisPaused=false;
 let tetrisLoopId=null;
 let tetrisDropMs=700;
+let tetrisLevel=1;
+let tetrisLastLevel=1;
 
 const TETRIS_SHAPES=[
  {name:"I",color:"#38bdf8",shape:[[1,1,1,1]]},
@@ -269,6 +271,9 @@ function resetTetrisBoard(){
  tetrisPiece=null;
  tetrisNextQueue=[randomTetrisPiece(),randomTetrisPiece(),randomTetrisPiece()];
  tetrisScoreValue=0;
+ tetrisLevel=1;
+ tetrisLastLevel=1;
+ tetrisDropMs=getTetrisDropMs(tetrisLevel);
  tetrisRunning=false;
  tetrisPaused=false;
  clearInterval(tetrisLoopId);
@@ -295,6 +300,39 @@ function spawnTetrisPiece(){
  if(collidesTetris(tetrisPiece.x,tetrisPiece.y,tetrisPiece.shape)){
    endTetris();
  }
+}
+
+function getTetrisLevel(score=tetrisScoreValue){
+ return Math.floor(Number(score||0)/5000)+1;
+}
+
+function getTetrisDropMs(level=getTetrisLevel()){
+ return Math.max(520,700-(Number(level||1)-1)*20);
+}
+
+function getTetrisScoreMultiplier(level=getTetrisLevel()){
+ return 1+(Number(level||1)-1)*0.15;
+}
+
+function refreshTetrisDifficulty(){
+ const nextLevel=getTetrisLevel();
+ tetrisLevel=nextLevel;
+ const nextDropMs=getTetrisDropMs(nextLevel);
+ if(nextLevel!==tetrisLastLevel||nextDropMs!==tetrisDropMs){
+   tetrisLastLevel=nextLevel;
+   tetrisDropMs=nextDropMs;
+   if(tetrisRunning){
+     clearInterval(tetrisLoopId);
+     tetrisLoopId=setInterval(tetrisTick,tetrisDropMs);
+   }
+ }
+}
+
+function addTetrisScore(baseScore){
+ const add=Math.max(0,Math.round(Number(baseScore||0)*getTetrisScoreMultiplier()));
+ if(add<=0)return;
+ tetrisScoreValue+=add;
+ refreshTetrisDifficulty();
 }
 
 function startTetris(){
@@ -350,7 +388,7 @@ function moveTetris(dx){
 function softDropTetris(){
  if(!tetrisRunning||tetrisPaused)return;
  if(tryMoveTetris(0,1)){
-   tetrisScoreValue+=1;
+   addTetrisScore(1);
    drawTetris();
  }else{
    tetrisTick();
@@ -361,7 +399,7 @@ function hardDropTetris(){
  if(!tetrisPiece||!tetrisRunning||tetrisPaused)return;
  let moved=0;
  while(tryMoveTetris(0,1))moved++;
- tetrisScoreValue+=moved*2;
+ addTetrisScore(moved*2);
  tetrisTick();
 }
 
@@ -407,7 +445,7 @@ function clearTetrisLines(){
  }
  if(cleared){
    const scoreMap=[0,100,300,500,800];
-   tetrisScoreValue+=scoreMap[cleared]||cleared*200;
+   addTetrisScore(scoreMap[cleared]||cleared*200);
  }
 }
 
@@ -428,8 +466,10 @@ function getTetrisBest(){
 }
 
 function updateTetrisInfo(){
+ refreshTetrisDifficulty();
  $("tetrisScore").textContent=String(tetrisScoreValue);
  $("tetrisBest").textContent=String(Math.max(getTetrisBest(),tetrisScoreValue));
+ if($("tetrisLevel"))$("tetrisLevel").textContent=String(tetrisLevel);
 }
 
 function drawCell(x,y,color){
