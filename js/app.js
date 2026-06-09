@@ -1591,6 +1591,12 @@ if($('testGithubBtn'))$('testGithubBtn').onclick=testGithubConnection;
 if($('githubSettingBtn'))$('githubSettingBtn').onclick=openGithubModal;
 if($('saveGithubSettingBtn'))$('saveGithubSettingBtn').onclick=saveGithubSetting;
 
+/* Supabase public version: force shared DB mode on every device */
+isGitEnabled=function(){return true};
+setGitEnabled=function(){localStorage.setItem(GIT_ENABLED_KEY,"Y")};
+localStorage.setItem(GIT_ENABLED_KEY,"Y");
+if(gitEnabledToggle){gitEnabledToggle.checked=true;gitEnabledToggle.disabled=true}
+
 saveState();
 render();
-setTimeout(()=>{updateGithubStatus();if(isGitEnabled())loadFromGithub({manual:false});},300);
+setTimeout(()=>{updateGithubStatus();loadFromGithub({manual:false});},300);
