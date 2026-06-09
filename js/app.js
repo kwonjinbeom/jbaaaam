@@ -272,6 +272,10 @@ function initTetrisIfNeeded(){
 function handleTetrisKey(e){
  if(currentMainView!=="tetris")return;
  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," ","p","P"].includes(e.key))e.preventDefault();
+ const startKeys=["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," "];
+ if(!tetrisRunning && startKeys.includes(e.key)){
+   startTetris();
+ }
  if(e.key==="ArrowLeft")moveTetris(-1);
  else if(e.key==="ArrowRight")moveTetris(1);
  else if(e.key==="Control")rotateTetrisPiece();
@@ -977,6 +981,10 @@ function initDinoIfNeeded(){
 function handleDinoKeyDown(e){
  if(currentMainView!=="dino")return;
  if(["ArrowUp","ArrowDown"," ","p","P"].includes(e.key))e.preventDefault();
+ const startKeys=["ArrowUp","ArrowDown"," "];
+ if(!dinoRunning && startKeys.includes(e.key)){
+   startDino();
+ }
  if(e.key==="ArrowUp"||e.key===" ")jumpDino();
  else if(e.key==="ArrowDown")setDinoDuck(true);
  else if(e.key==="p"||e.key==="P")toggleDinoPause();
@@ -1054,7 +1062,8 @@ function dinoLoop(ts){
 function updateDino(dt){
  dinoScoreValue+=dt*65*dinoSpeed;
  const speedDifficulty=Math.max(0,dinoScoreValue-200);
- dinoSpeed=1+Math.min(speedDifficulty/2200,1.25);
+ // 점수가 계속 오르면 속도도 계속 증가하되, 너무 급격하지 않게 완만한 곡선으로 증가
+ dinoSpeed=1+Math.sqrt(speedDifficulty)/58;
  const runSpeed=285*dinoSpeed;
  dinoGroundX=(dinoGroundX-runSpeed*dt)%34;
  dino.vy+=(DINO_GRAVITY+(dinoDuck&&!dino.onGround?2600:0))*dt;
@@ -1239,6 +1248,10 @@ function handleBambooKeyDown(e){
  if(currentMainView!=="bamboo")return;
  const k=e.key.toLowerCase();
  if(["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d","p"].includes(k))e.preventDefault();
+ const startKeys=["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d"];
+ if(!bambooRunning && startKeys.includes(k)){
+   startBamboo();
+ }
  if(k==="arrowup"||k==="w")bambooKeys.up=true;
  else if(k==="arrowdown"||k==="s")bambooKeys.down=true;
  else if(k==="arrowleft"||k==="a")bambooKeys.left=true;
@@ -1717,7 +1730,22 @@ if(deleteItemBtn)deleteItemBtn.onclick=deleteItem;
 const originalDeleteSheetForSupabase=deleteSheet;
 deleteSheet=function(id){addSheetDelete(id);originalDeleteSheetForSupabase(id)};
 const originalSaveScoreRecordForSupabase=saveScoreRecord;
-saveScoreRecord=function(){originalSaveScoreRecordForSupabase();if(isGitEnabled())setTimeout(()=>insertMissingScoresToSupabase(pendingGameKey).then(()=>loadFromGithub({manual:false})).catch(e=>{lastGithubError=shortErrorText(e);lastSyncText=`스코어 저장 실패 · Supabase 실패 ${nowText()}`;updateGithubStatus();showToast("Supabase 저장 실패 · 연결을 확인해줘","error")}),150)};
+let isScoreSaveSubmitting=false;
+saveScoreRecord=function(){
+ if(isScoreSaveSubmitting)return;
+ isScoreSaveSubmitting=true;
+ const btn=$('saveScoreRecordBtn');
+ if(btn)btn.disabled=true;
+ const gameKeyBefore=pendingGameKey||"tetris";
+ try{
+   originalSaveScoreRecordForSupabase();
+ }finally{
+   setTimeout(()=>{isScoreSaveSubmitting=false;if(btn)btn.disabled=false;},700);
+ }
+ if(isGitEnabled()){
+   setTimeout(()=>pruneSupabaseGameScores(gameKeyBefore).catch(e=>{lastGithubError=shortErrorText(e);lastSyncText=`스코어 정리 실패 ${nowText()}`;updateGithubStatus();}),900);
+ }
+};
 if($('saveScoreRecordBtn'))$('saveScoreRecordBtn').onclick=saveScoreRecord;
 const originalOpenGameScoreBoardModalForSupabase=openGameScoreBoardModal;
 openGameScoreBoardModal=function(gameKey="tetris"){
