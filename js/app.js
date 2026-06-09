@@ -1867,3 +1867,123 @@ async function submitGuestbookMessage(){
 // 메뉴 정리 후 현재 화면 활성 상태 보정
 setMainView(currentMainView||"home");
 setTimeout(()=>loadGuestbook({silent:true}),500);
+
+
+/* FINAL stabilization 20260609-1 */
+(function(){
+  const safe=id=>document.getElementById(id);
+  window.escapeHtml=window.escapeHtml||function(t){return esc(t)};
+
+  if(typeof isGitEnabled==='function') isGitEnabled=function(){return true};
+  if(typeof setGitEnabled==='function') setGitEnabled=function(){localStorage.setItem(GIT_ENABLED_KEY,'Y')};
+  localStorage.setItem(GIT_ENABLED_KEY,'Y');
+
+  function sheetCardHtml(sheet){
+    const items=Array.isArray(sheet.items)?sheet.items:[];
+    const inc=items.filter(i=>i.type==='income').reduce((s,i)=>s+Number(i.amount||0),0);
+    const exp=items.filter(i=>i.type==='expense').reduce((s,i)=>s+Number(i.amount||0),0);
+    return `<div style="min-width:0"><div class="sheet-name">${esc(sheet.name)}</div><div class="sheet-meta">남은 금액 ${money(inc-exp)}</div></div><div class="sheet-actions"><button class="sheet-edit">수정</button><button class="sheet-delete">삭제</button></div>`;
+  }
+
+  renderSheetList=function(){
+    state=normalizeState(state);
+    const targets=[safe('sheetList'),safe('budgetSheetList')].filter(Boolean);
+    targets.forEach(target=>{
+      target.innerHTML='';
+      state.sheets.forEach(sheet=>{
+        const row=document.createElement('div');
+        row.className='sheet-item'+(sheet.id===state.currentSheetId?' active':'');
+        row.innerHTML=sheetCardHtml(sheet);
+        row.onclick=()=>{state.currentSheetId=sheet.id;saveState();render();setMainView('budget');};
+        const edit=row.querySelector('.sheet-edit');
+        const del=row.querySelector('.sheet-delete');
+        if(edit)edit.onclick=e=>{e.stopPropagation();openSheetModal('rename',sheet.id)};
+        if(del)del.onclick=e=>{e.stopPropagation();deleteSheet(sheet.id)};
+        target.appendChild(row);
+      });
+    });
+  };
+
+  const originalRender=render;
+  render=function(){
+    originalRender();
+    renderSheetList();
+    updateGithubStatus();
+    renderGuestMini();
+  };
+
+  setMainView=function(view){
+    currentMainView=['home','budgetList','budget','tetris','dino','bamboo','guestbook'].includes(view)?view:'home';
+    const flags={
+      home:currentMainView==='home',budgetList:currentMainView==='budgetList',budget:currentMainView==='budget',
+      tetris:currentMainView==='tetris',dino:currentMainView==='dino',bamboo:currentMainView==='bamboo',guestbook:currentMainView==='guestbook'
+    };
+    [['homeView',flags.home],['budgetListView',flags.budgetList],['budgetView',flags.budget],['tetrisView',flags.tetris],['dinoView',flags.dino],['bambooView',flags.bamboo],['guestbookView',flags.guestbook]].forEach(([id,on])=>{const el=safe(id);if(el)el.classList.toggle('active',on)});
+    const add=safe('addBtn');if(add)add.style.display=flags.budget?'block':'none';
+    [['showBudgetBtn',flags.budget||flags.budgetList],['showTetrisBtn',flags.tetris],['showDinoBtn',flags.dino],['showBambooBtn',flags.bamboo]].forEach(([id,on])=>{const el=safe(id);if(el)el.classList.toggle('active',on)});
+    closeDrawer();
+    if(flags.budgetList)renderSheetList();
+    if(flags.tetris){initTetrisIfNeeded();drawTetris()}
+    if(flags.dino){initDinoIfNeeded();drawDino()}
+    if(flags.bamboo){initBambooIfNeeded();drawBamboo()}
+    if(flags.guestbook)loadGuestbook({silent:true});
+  };
+
+  updateGithubStatus=function(){
+    const errText=lastGithubError?`\n오류: ${lastGithubError}`:'';
+    if(githubBox)githubBox.classList.remove('git-off');
+    if(githubStatus)githubStatus.textContent=`Supabase 공유 저장\nproject: mnsxaulypjrnczearlyd · schema: public\n저장소: game_scores / budget_sheets / app_meta / guestbook\n${lastSyncText}${errText}`;
+  };
+
+  function topRecords(gameKey){return getGameRecords(gameKey).slice().sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,15)}
+  const originalOpenScoreNameModal=openScoreNameModal;
+  openScoreNameModal=function(score,gameKey='tetris'){
+    const records=topRecords(gameKey); const n=Number(score)||0;
+    if(n<=0)return;
+    if(records.length>=15 && n<=Number(records[14].score||0)){
+      showToast(`15위 안에 들어야 저장돼 · 기준 ${Number(records[14].score||0).toLocaleString()}점`,'error');
+      return;
+    }
+    originalOpenScoreNameModal(score,gameKey);
+  };
+  renderScoreBoard=function(){
+    const list=safe('scoreList'); if(!list)return;
+    const records=topRecords(scoreBoardGameKey);
+    if(!records.length){list.innerHTML='<div class="score-empty">아직 저장된 스코어가 없어.</div>';return;}
+    list.innerHTML=records.map((r,i)=>`<div class="score-row"><div class="score-rank">${i+1}</div><div><div class="score-name">${esc(r.name)}</div><div class="score-date">${formatScoreDate(r.dt)}</div></div><div class="score-value">${Number(r.score).toLocaleString()}</div></div>`).join('');
+  };
+
+  if(typeof clearScoreBoard==='function') clearScoreBoard=function(){showToast('스코어 삭제는 막아뒀어')};
+
+  function renderGuestMini(){
+    const mini=safe('guestMiniList'); if(!mini)return;
+    const rows=(guestbookMessages||[]).slice(0,5);
+    if(!rows.length){mini.innerHTML='<div class="empty" style="padding:14px 8px;font-size:12px">아직 방명록이 없어.</div>';return;}
+    mini.innerHTML=rows.map(m=>`<div class="guest-mini-row"><div class="guest-mini-row-name">${esc(m.name||'익명')}</div><div class="guest-mini-row-content">${esc(m.content||'')}</div></div>`).join('');
+  }
+  const originalRenderGuestbook=renderGuestbook;
+  renderGuestbook=function(){originalRenderGuestbook();renderGuestMini();};
+  const originalLoadGuestbook=loadGuestbook;
+  loadGuestbook=async function(opts={}){await originalLoadGuestbook(opts);renderGuestMini();};
+
+  const bind=(id,fn)=>{const el=safe(id);if(el)el.onclick=fn};
+  bind('drawerHomeBtn',()=>setMainView('home'));
+  bind('showBudgetBtn',()=>setMainView('budgetList'));
+  bind('showTetrisBtn',()=>setMainView('tetris'));
+  bind('showDinoBtn',()=>setMainView('dino'));
+  bind('showBambooBtn',()=>setMainView('bamboo'));
+  bind('homeBudgetCard',()=>setMainView('budgetList'));
+  bind('newSheetBtnMain',()=>openSheetModal('new'));
+  bind('menuBtnBudgetList',openDrawer);
+  bind('menuBtnGuestbook',openDrawer);
+  bind('guestMoreBtn',()=>setMainView('guestbook'));
+  bind('guestSendBtn',submitGuestbookMessage);
+  bind('guestbookRefreshBtn',()=>loadGuestbook({silent:false}));
+
+  // score modal must not close by backdrop
+  const scoreModal=safe('scoreNameModalBackdrop'); if(scoreModal)scoreModal.onclick=function(){};
+  const itemModal=safe('itemModalBackdrop'); if(itemModal)itemModal.onclick=function(){};
+
+  // Force stable initial page after async Supabase load
+  setTimeout(()=>{render();setMainView(currentMainView||'home');loadGuestbook({silent:true});},250);
+})();
