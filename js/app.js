@@ -1859,10 +1859,11 @@ bindClick("guestSendBtn",submitGuestbookMessage);
 bindClick("guestbookRefreshBtn",()=>loadGuestbook({silent:false}));
 
 async function fetchGuestbookMessages(){
- const rows=await sbFetch('/guestbook?select=id,name,content,created_at&order=created_at.desc&limit=200');
+ const rows=await sbFetch('/guestbook?select=id,name,content,parent_id,created_at&order=created_at.desc&limit=500');
  const list=Array.isArray(rows)?rows:[];
  return list.map(m=>({
   id:m.id||newId(),
+  parent_id:m.parent_id||null,
   name:String(m.name||"익명").slice(0,20),
   content:String(m.content||"").slice(0,300),
   created_at:m.created_at||new Date().toISOString()
@@ -1874,15 +1875,26 @@ async function insertGuestbookMessage(message){
   name:String(message.name||"익명").slice(0,20),
   content:String(message.content||"").slice(0,300)
  };
+ if(message.parent_id)row.parent_id=message.parent_id;
  await sbFetch('/guestbook',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify([row])});
  guestbookMessages=await fetchGuestbookMessages();
  return guestbookMessages;
 }
 
+function getTopGuestbookMessages(){
+ return (guestbookMessages||[]).filter(m=>!m.parent_id);
+}
+
+function getGuestbookReplies(parentId){
+ return (guestbookMessages||[])
+  .filter(m=>m.parent_id===parentId)
+  .sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+}
+
 function renderGuestMini(){
  const mini=safeEl("guestMiniList");
  if(!mini)return;
- const recent=(guestbookMessages||[]).slice(0,5);
+ const recent=getTopGuestbookMessages().slice(0,5);
  if(!recent.length){mini.innerHTML="";return}
  mini.innerHTML=recent.map(m=>`
   <div class="guest-mini-item">
@@ -1896,13 +1908,39 @@ function renderGuestbook(){
  const list=safeEl("guestbookList");
  renderGuestMini();
  if(!list)return;
- if(!guestbookMessages.length){list.innerHTML='<div class="empty">아직 글이 없어.</div>';return}
- list.innerHTML=guestbookMessages.map(m=>`
+ const topMessages=getTopGuestbookMessages();
+ if(!topMessages.length){list.innerHTML='<div class="empty">아직 글이 없어.</div>';return}
+ list.innerHTML=topMessages.map(m=>{
+  const replies=getGuestbookReplies(m.id);
+  const replyHtml=replies.length?`
+    <div class="guest-reply-list">
+      ${replies.map(r=>`
+        <div class="guest-reply-item">
+          <div class="guest-reply-top"><b>${esc(r.name||"익명")}</b><span>${formatScoreDate(r.created_at)}</span></div>
+          <div class="guest-reply-content">${esc(r.content||"")}</div>
+        </div>
+      `).join("")}
+    </div>
+  `:"";
+  return `
   <div class="guestbook-item">
     <div class="guestbook-top"><div class="guestbook-name">${esc(m.name||"익명")}</div><div class="guestbook-date">${formatScoreDate(m.created_at)}</div></div>
     <div class="guestbook-content">${esc(m.content||"")}</div>
+    ${replyHtml}
+    <div class="guest-reply-form" data-parent-id="${esc(m.id)}">
+      <div class="guest-reply-title">대댓글</div>
+      <input class="input guest-reply-name" maxlength="20" placeholder="이름">
+      <textarea class="input guest-reply-content-input" maxlength="300" placeholder="내용"></textarea>
+      <button class="guest-reply-send" type="button">등록</button>
+    </div>
   </div>
- `).join("");
+ `}).join("");
+ list.querySelectorAll(".guest-reply-send").forEach(btn=>{
+  btn.onclick=()=>{
+   const form=btn.closest(".guest-reply-form");
+   if(form)submitGuestbookReply(form.dataset.parentId,form);
+  };
+ });
 }
 
 async function loadGuestbook({silent=false}={}){
@@ -1911,7 +1949,8 @@ async function loadGuestbook({silent=false}={}){
   if(status&&!silent)status.textContent="방명록 불러오는 중...";
   guestbookMessages=await fetchGuestbookMessages();
   renderGuestbook();
-  if(status)status.textContent=guestbookMessages.length?`최근 ${Math.min(5,guestbookMessages.length)}개 표시`:"";
+  const topCount=getTopGuestbookMessages().length;
+  if(status)status.textContent=topCount?`최근 ${Math.min(5,topCount)}개 표시`:"";
  }catch(e){
   console.error(e);
   if(status)status.textContent="방명록 불러오기 실패";
@@ -1937,6 +1976,25 @@ async function submitGuestbookMessage(){
   console.error(e);
   if(status)status.textContent="방명록 저장 실패";
   showToast("방명록 저장 실패","error");
+ }
+}
+
+async function submitGuestbookReply(parentId,form){
+ const nameEl=form.querySelector(".guest-reply-name");
+ const contentEl=form.querySelector(".guest-reply-content-input");
+ const btn=form.querySelector(".guest-reply-send");
+ const name=(nameEl&&nameEl.value.trim()?nameEl.value.trim():"익명").slice(0,20);
+ const content=(contentEl&&contentEl.value.trim()?contentEl.value.trim():"").slice(0,300);
+ if(!content){if(contentEl)contentEl.focus();return}
+ try{
+  if(btn){btn.disabled=true;btn.textContent="저장 중";}
+  await insertGuestbookMessage({name,content,parent_id:parentId});
+  showToast("대댓글 저장 완료");
+  renderGuestbook();
+ }catch(e){
+  console.error(e);
+  showToast("대댓글 저장 실패","error");
+  if(btn){btn.disabled=false;btn.textContent="등록";}
  }
 }
 
