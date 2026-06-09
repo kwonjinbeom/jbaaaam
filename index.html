@@ -1535,11 +1535,9 @@ async function loadFromGithub({manual=false}={}){
    updateGithubStatus();
    alert("GitHub 불러오기 실패: "+lastGithubError);
  }else{
-   setGitEnabled(false);
-   state=normalizeState(loadState());
-   lastSyncText=`GitHub 불러오기 실패 → localStorage 모드 전환 ${nowText()}`;
-   render();
-   showToast("GitHub 실패 · localStorage 모드","error");
+   lastSyncText=`GitHub 불러오기 실패 ${nowText()}`;
+   updateGithubStatus();
+   showToast("GitHub 불러오기 실패","error");
  }
 }
 }
