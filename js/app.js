@@ -1801,10 +1801,24 @@ async function insertGuestbookMessage(message){
  return guestbookMessages;
 }
 
+function renderGuestMini(){
+ const mini=safeEl("guestMiniList");
+ if(!mini)return;
+ const recent=(guestbookMessages||[]).slice(0,5);
+ if(!recent.length){mini.innerHTML="";return}
+ mini.innerHTML=recent.map(m=>`
+  <div class="guest-mini-item">
+    <div class="guest-mini-top"><b>${esc(m.name||"익명")}</b><span>${formatScoreDate(m.created_at)}</span></div>
+    <div class="guest-mini-content">${esc(m.content||"")}</div>
+  </div>
+ `).join("");
+}
+
 function renderGuestbook(){
  const list=safeEl("guestbookList");
+ renderGuestMini();
  if(!list)return;
- if(!guestbookMessages.length){list.innerHTML='<div class="empty">아직 남긴 방명록이 없어.</div>';return}
+ if(!guestbookMessages.length){list.innerHTML='<div class="empty">아직 글이 없어.</div>';return}
  list.innerHTML=guestbookMessages.map(m=>`
   <div class="guestbook-item">
     <div class="guestbook-top"><div class="guestbook-name">${esc(m.name||"익명")}</div><div class="guestbook-date">${formatScoreDate(m.created_at)}</div></div>
@@ -1819,7 +1833,7 @@ async function loadGuestbook({silent=false}={}){
   if(status&&!silent)status.textContent="방명록 불러오는 중...";
   guestbookMessages=await fetchGuestbookMessages();
   renderGuestbook();
-  if(status)status.textContent=guestbookMessages.length?`최근 ${guestbookMessages.length}개 표시 중`:"아직 방명록이 없어.";
+  if(status)status.textContent=guestbookMessages.length?`최근 ${Math.min(5,guestbookMessages.length)}개 표시`:"";
  }catch(e){
   console.error(e);
   if(status)status.textContent="방명록 불러오기 실패";
