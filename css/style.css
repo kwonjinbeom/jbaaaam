@@ -1084,3 +1084,49 @@ textarea.input{height:72px;resize:none;padding-top:12px;line-height:1.35}.input:
   justify-self:end;
   text-align:right;
 }
+
+/* 20260609: force guestbook dates to the far right */
+.guestbook-item{
+  position:relative !important;
+  padding:14px !important;
+}
+.guestbook-top{
+  display:block !important;
+  width:100% !important;
+  margin-bottom:8px !important;
+  padding-right:92px !important;
+  min-height:22px !important;
+}
+.guestbook-name-wrap{
+  display:flex !important;
+  align-items:center !important;
+  gap:7px !important;
+  min-width:0 !important;
+  max-width:100% !important;
+}
+.guestbook-date{
+  position:absolute !important;
+  top:16px !important;
+  right:14px !important;
+  text-align:right !important;
+  white-space:nowrap !important;
+  font-size:11px !important;
+  color:#9ca3af !important;
+}
+.guest-reply-item{
+  position:relative !important;
+  padding:10px 12px !important;
+}
+.guest-reply-top{
+  display:block !important;
+  width:100% !important;
+  padding-right:86px !important;
+  min-height:18px !important;
+}
+.guest-reply-top span{
+  position:absolute !important;
+  top:11px !important;
+  right:12px !important;
+  text-align:right !important;
+  white-space:nowrap !important;
+}
