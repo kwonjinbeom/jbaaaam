@@ -823,8 +823,7 @@ textarea.input{height:72px;resize:none;padding-top:12px;line-height:1.35}.input:
     <button class="modal-close-btn" id="closeScoreBoardBtn">×</button>
   </div>
   <div class="score-list" id="scoreList"></div>
-  <div class="modal-actions">
-    <button class="danger" id="clearScoreBoardBtn">전체삭제</button>
+  <div class="modal-actions" style="grid-template-columns:1fr">
     <button class="primary" id="okScoreBoardBtn">확인</button>
   </div>
 </div></div></div>
@@ -873,7 +872,7 @@ amountInput.addEventListener("input", formatAmountInput);
 $("cancelSheetBtn").onclick=closeSheetModal;$("closeSheetModalBtn").onclick=closeSheetModal;$("saveSheetBtn").onclick=saveSheetName;
 sheetModalBackdrop.onclick=e=>{};
 
-$("cancelGithubBtn").onclick=closeGithubModal;$("closeGithubModalBtn").onclick=closeGithubModal;$("saveGithubSettingBtn").onclick=saveGithubSetting;$("closeScoreNameBtn").onclick=closeScoreNameModal;$("skipScoreSaveBtn").onclick=closeScoreNameModal;$("saveScoreRecordBtn").onclick=saveScoreRecord;$("closeScoreBoardBtn").onclick=closeScoreBoardModal;$("okScoreBoardBtn").onclick=closeScoreBoardModal;$("clearScoreBoardBtn").onclick=clearScoreBoard;
+$("cancelGithubBtn").onclick=closeGithubModal;$("closeGithubModalBtn").onclick=closeGithubModal;$("saveGithubSettingBtn").onclick=saveGithubSetting;$("closeScoreNameBtn").onclick=closeScoreNameModal;$("skipScoreSaveBtn").onclick=closeScoreNameModal;$("saveScoreRecordBtn").onclick=saveScoreRecord;$("closeScoreBoardBtn").onclick=closeScoreBoardModal;$("okScoreBoardBtn").onclick=closeScoreBoardModal;if($("clearScoreBoardBtn"))$("clearScoreBoardBtn").onclick=clearScoreBoard;
 githubModalBackdrop.onclick=e=>{};
 
 
@@ -1043,6 +1042,38 @@ function clearScoreBoard(){
  if(gameKey==="bamboo")updateBambooInfo();
  renderScoreBoard();
  showToast("스코어 삭제 완료");
+}
+
+function mergeLocalGameRecordsIntoCurrentState(){
+ let localRaw=null;
+ try{
+   localRaw=JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY)||"null");
+ }catch{}
+ if(!localRaw||!localRaw.games)return 0;
+ state=normalizeState(state);
+ const localGames=localRaw.games||{};
+ let merged=0;
+ ["tetris","dino","bamboo"].forEach(gameKey=>{
+   if(!state.games[gameKey])state.games[gameKey]={bestScore:0,records:[]};
+   const target=state.games[gameKey];
+   const localGame=localGames[gameKey]||{};
+   const records=Array.isArray(localGame.records)?localGame.records:[];
+   const exists=new Set((target.records||[]).map(r=>`${r.id||""}|${r.name}|${Number(r.score)||0}|${r.dt||""}`));
+   records.forEach(r=>{
+     const score=Number(r.score)||0;
+     if(score<=0)return;
+     const rec={id:r.id||newId(),name:String(r.name||"익명"),score,dt:r.dt||new Date().toISOString()};
+     const key=`${rec.id||""}|${rec.name}|${rec.score}|${rec.dt||""}`;
+     if(exists.has(key))return;
+     target.records.push(rec);
+     exists.add(key);
+     merged++;
+   });
+   const localBest=Number(localGame.bestScore)||0;
+   target.bestScore=Math.max(Number(target.bestScore)||0,localBest,...(target.records||[]).map(r=>Number(r.score)||0));
+   target.records=(target.records||[]).sort((a,b)=>Number(b.score)-Number(a.score)).slice(0,50);
+ });
+ return merged;
 }
 
 /* Tetris */
@@ -1522,10 +1553,19 @@ function decodeBase64Utf8(str){return decodeURIComponent(escape(atob(str.replace
 async function loadFromGithub({manual=false}={}){
  if(!isGitEnabled()){if(manual)showToast("GitHub OFF 상태야");updateGithubStatus();return}
  const s=getGithubSetting();if(!s.token){if(manual){alert("먼저 GitHub 설정에서 토큰을 넣어줘.");openGithubModal()}return}
- try{lastSyncText="GitHub 불러오는 중...";updateGithubStatus();const file=await getGithubFile(s);if(!file){lastSyncText="data.json 없음. 저장하면 생성됨";updateGithubStatus();if(manual)alert("data.json 파일이 아직 없어. 현재 데이터를 GitHub에 먼저 저장하면 생성돼.");return}
+ try{lastSyncText="GitHub 불러오는 중...";updateGithubStatus();const file=await getGithubFile(s);if(!file){
+   const mergedCount=mergeLocalGameRecordsIntoCurrentState();
+   saveState();
+   render();
+   lastSyncText=mergedCount?`data.json 없음 · 로컬 게임기록 ${mergedCount}개 반영`:"data.json 없음. 저장하면 생성됨";
+   updateGithubStatus();
+   if(mergedCount>0)requestGithubSave({manual:false});
+   if(manual)alert(mergedCount?`data.json 파일이 아직 없어. 로컬 게임기록 ${mergedCount}개를 반영했어. 수동 저장하면 생성돼.`:"data.json 파일이 아직 없어. 현재 데이터를 GitHub에 먼저 저장하면 생성돼.");
+   return
+ }
  const parsed=JSON.parse(decodeBase64Utf8(file.content));const imported=decryptBudgetPayload(parsed);if(!imported||!Array.isArray(imported.sheets))throw new Error("invalid data");
  if(manual&&!confirm("GitHub의 data.json 내용으로 현재 화면 데이터가 바뀌어. 계속할까?")){lastSyncText="수동 불러오기 취소";updateGithubStatus();return}
- isApplyingRemote=true;state=normalizeState(imported);lastGithubSha=file.sha;lastGithubError="";saveState();render();isApplyingRemote=false;lastSyncText=`GitHub 불러오기 완료 ${nowText()}`;updateGithubStatus();if(manual)alert("GitHub 불러오기 완료.")
+ isApplyingRemote=true;state=normalizeState(imported);const mergedCount=mergeLocalGameRecordsIntoCurrentState();lastGithubSha=file.sha;lastGithubError="";saveState();render();isApplyingRemote=false;lastSyncText=mergedCount?`GitHub 불러오기 완료 · 로컬 게임기록 ${mergedCount}개 병합 ${nowText()}`:`GitHub 불러오기 완료 ${nowText()}`;updateGithubStatus();if(mergedCount>0)requestGithubSave({manual:false});if(manual)alert(mergedCount?`GitHub 불러오기 완료. 로컬 게임기록 ${mergedCount}개를 GitHub 기록에 추가했어.`:"GitHub 불러오기 완료.")
  }catch(e){
  console.error(e);
  isApplyingRemote=false;
