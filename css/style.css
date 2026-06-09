@@ -1047,3 +1047,40 @@ textarea.input{height:72px;resize:none;padding-top:12px;line-height:1.35}.input:
 .guestbook-item{position:relative}
 
 .guestbook-item{position:relative;padding-right:48px}
+
+
+/* 20260609: guestbook date alignment cleanup */
+.guestbook-item{
+  padding:14px !important;
+}
+.guestbook-top{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;
+  gap:10px;
+  width:100%;
+}
+.guestbook-name-wrap{
+  min-width:0;
+  max-width:100%;
+}
+.guestbook-name{
+  min-width:0;
+  word-break:break-word;
+}
+.guestbook-date{
+  justify-self:end;
+  text-align:right;
+  white-space:nowrap;
+  padding-top:2px;
+}
+.guest-reply-top{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;
+  gap:8px;
+}
+.guest-reply-top span{
+  justify-self:end;
+  text-align:right;
+}

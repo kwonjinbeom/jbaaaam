@@ -1856,7 +1856,6 @@ bindClick("homeDinoCard",()=>setMainView("dino"));
 bindClick("homeBambooCard",()=>setMainView("bamboo"));
 bindClick("guestMoreBtn",()=>setMainView("guestbook"));
 bindClick("guestSendBtn",submitGuestbookMessage);
-bindClick("guestbookRefreshBtn",()=>loadGuestbook({silent:false}));
 
 async function fetchGuestbookMessages(){
  const rows=await sbFetch('/guestbook?select=id,name,content,parent_id,created_at&order=created_at.desc&limit=500');
