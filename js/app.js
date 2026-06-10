@@ -2197,7 +2197,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(e.key==='ArrowRight')jumpKeys.right=true;
     if(isStartKey){
       jumpKeys.jump=true;
-      jumpHandleJumpControlStart();
+      jumpStartOrJump();
     }
     if(e.key==='r'||e.key==='R')jumpRestart();
     if(e.key==='p'||e.key==='P')jumpTogglePause();
@@ -2764,4 +2764,51 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   if(typeof updateGithubStatus==='function'){ const oldUpdate=updateGithubStatus; updateGithubStatus=function(){ oldUpdate(); if(githubStatus&&githubStatus.textContent&&!githubStatus.textContent.includes('omok_rooms')) githubStatus.textContent=githubStatus.textContent.replace('jump_players / jump_stage_clears','jump_players / jump_stage_clears / omok_rooms / omok_moves'); }; }
   if(typeof testGithubConnection==='function'){ const oldTest=testGithubConnection; testGithubConnection=async function(){ await oldTest(); try{ await sbFetch('/omok_rooms?select=id&limit=1'); await sbFetch('/omok_moves?select=id&limit=1'); await sbFetch('/omok_player_stats?select=player_name&limit=1'); await sbFetch('/omok_recent_matches?select=room_code&limit=1'); omokToast('Supabase + 오목 테이블/전적 뷰 연결 성공'); }catch(e){ alert('오목 테이블 확인 실패: '+omokErr(e)+'\n전달한 supabase_omok.sql을 먼저 실행해줘.'); } }; const btn=omokSafe('testGithubBtn'); if(btn)btn.onclick=testGithubConnection; }
   omokInstallDom(); const hc=omokSafe('homeOmokCard'); if(hc)hc.onclick=()=>setMainView('omok'); const mb=omokSafe('showOmokBtn'); if(mb)mb.onclick=()=>setMainView('omok'); setMainView(currentMainView||'home');
+})();
+
+/* Drawer menu scroll fix: keep newly added menu items reachable on small screens */
+(function installDrawerMenuScrollFix(){
+  if(document.getElementById('drawerMenuScrollFixStyle'))return;
+  const st=document.createElement('style');
+  st.id='drawerMenuScrollFixStyle';
+  st.textContent=`
+    #drawerBackdrop.open{overflow:hidden!important;}
+    #drawerBackdrop > *{
+      max-height:calc(100dvh - 20px)!important;
+      overflow-y:auto!important;
+      -webkit-overflow-scrolling:touch!important;
+      overscroll-behavior:contain!important;
+    }
+    #drawerBackdrop .drawer,
+    #drawerBackdrop .drawer-panel,
+    #drawerBackdrop .drawer-content,
+    #drawerBackdrop .side-drawer,
+    #drawerBackdrop .sheet-drawer,
+    #drawerBackdrop .menu-drawer,
+    #drawerBackdrop [class*="drawer"]{
+      max-height:calc(100dvh - 20px)!important;
+      overflow-y:auto!important;
+      -webkit-overflow-scrolling:touch!important;
+      overscroll-behavior:contain!important;
+    }
+    #drawerBackdrop .sheet-list,
+    #drawerBackdrop #sheetList,
+    #drawerBackdrop .menu-section,
+    #drawerBackdrop .menu-section-btn{
+      flex-shrink:0!important;
+    }
+    @supports(height:100svh){
+      #drawerBackdrop > *,
+      #drawerBackdrop .drawer,
+      #drawerBackdrop .drawer-panel,
+      #drawerBackdrop .drawer-content,
+      #drawerBackdrop .side-drawer,
+      #drawerBackdrop .sheet-drawer,
+      #drawerBackdrop .menu-drawer,
+      #drawerBackdrop [class*="drawer"]{
+        max-height:calc(100svh - 20px)!important;
+      }
+    }
+  `;
+  document.head.appendChild(st);
 })();
