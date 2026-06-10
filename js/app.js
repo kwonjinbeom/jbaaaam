@@ -2293,88 +2293,124 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     const baseY=248;
     const height=300;
     const mk=(x,y,w,type='solid',extra={})=>({x,y,w,h:18,type,baseX:x,phase:0,range:0,speed:0,...extra});
+    const startBlock={x:0,y:baseY,w:132,h:34,type:'solid'};
     const finish=(platforms,hazards=[],bg=0)=>{
       platforms.sort((a,b)=>a.x-b.x||a.y-b.y);
       const last=platforms[platforms.length-1];
-      const width=Math.max(720,last.x+last.w+115);
-      return {no:stage,width,height,baseY,start:{x:34,y:baseY-50},goal:{x:last.x+Math.max(26,last.w-34),y:last.y-42,w:34,h:42},platforms,hazards,bg:bg%4};
+      const width=Math.max(720,last.x+last.w+125);
+      return {no:stage,width,height,baseY,start:{x:32,y:baseY-50},goal:{x:last.x+Math.max(22,last.w-31),y:last.y-42,w:34,h:42},platforms,hazards,bg:bg%4};
+    };
+    const addFloorSpikes=(hazards,from,to,count,offset=0)=>{
+      for(let i=0;i<count;i++){
+        const x=from+offset+i*((to-from)/Math.max(1,count));
+        if(x>155&&x<to)hazards.push({x:Math.round(x),y:260,w:24,h:20,type:'spike'});
+      }
+    };
+    const laneHazard=(hazards,p,side='right')=>{
+      if(!p||p.w<64)return;
+      const x=side==='left'?p.x+5:p.x+p.w-23;
+      hazards.push({x:Math.round(x),y:p.y-18,w:19,h:18,type:'spike'});
     };
 
-    if(stage===1){
-      return finish([
-        {x:0,y:baseY,w:145,h:34,type:'solid'},
-        mk(228,218,108),mk(388,205,104),mk(555,218,118)
-      ],[],0);
-    }
-    if(stage===2){
-      return finish([
-        {x:0,y:baseY,w:145,h:34,type:'solid'},
-        mk(218,222,98),mk(370,190,92),mk(522,158,92),mk(676,190,118)
-      ],[],1);
-    }
-    if(stage===3){
-      return finish([
-        {x:0,y:baseY,w:150,h:34,type:'solid'},
-        mk(220,224,112),mk(382,224,92),mk(536,196,104),mk(692,218,122)
-      ],[
-        {x:350,y:260,w:24,h:20,type:'spike'},
-        {x:640,y:260,w:24,h:20,type:'spike'}
-      ],2);
+    const manual={
+      1:{bg:0,p:[[206,226,78],[335,217,70],[462,226,82],[602,211,78]],h:[[280,260,24,20],[548,260,24,20]]},
+      2:{bg:1,p:[[202,230,74],[326,200,64],[454,171,62],[588,202,66],[722,225,80]],h:[[286,260,24,20],[656,260,24,20]]},
+      3:{bg:2,p:[[196,221,68],[318,202,60],[442,224,56],[570,198,62],[704,218,74]],h:[[376,260,24,20],[498,260,24,20],[642,260,24,20]]},
+      4:{bg:3,p:[[202,236,60],[328,236,52,'ice'],[458,208,58],[590,184,52],[726,214,70]],h:[[390,260,24,20],[666,260,24,20]]},
+      5:{bg:0,p:[[194,224,62],[320,194,54],[456,164,52],[596,196,54],[730,226,72]],h:[[263,206,18,18],[520,260,24,20],[660,260,24,20]]},
+      6:{bg:1,p:[[198,226,58],[320,226,46],[438,204,48],[560,181,46,'spring'],[688,215,58],[816,232,70]],h:[[266,260,24,20],[384,260,24,20],[620,260,24,20]]},
+      7:{bg:2,p:[[204,232,52],[330,206,48],[454,232,46],[582,206,46],[710,181,46],[842,214,62]],h:[[382,260,24,20],[514,260,24,20],[773,260,24,20]]},
+      8:{bg:3,p:[[204,220,54],[333,198,46],[461,176,44],[593,205,44,'ice'],[724,230,50],[854,205,62]],h:[[272,260,24,20],[397,260,24,20],[657,260,24,20],[792,260,24,20]]},
+      9:{bg:0,p:[[206,226,50],[334,197,44,'move',0,32,.78],[470,218,44],[604,189,42],[740,216,48],[878,196,62]],h:[[292,260,24,20],[530,260,24,20],[806,260,24,20]]},
+      10:{bg:1,p:[[198,232,48],[320,202,42],[444,174,42,'spring'],[578,208,42],[708,183,40,'move',0,34,.82],[842,218,60]],h:[[260,260,24,20],[382,260,24,20],[642,260,24,20],[778,260,24,20]]},
+      11:{bg:2,p:[[202,226,46],[326,207,40],[452,188,38],[580,218,40],[708,191,38],[840,164,40],[970,204,60]],h:[[266,260,24,20],[394,260,24,20],[648,260,24,20],[775,260,24,20]]},
+      12:{bg:3,p:[[200,234,44],[324,214,40,'ice'],[448,194,38],[575,174,38],[704,204,36,'move',1,38,.9],[838,228,56]],h:[[270,260,24,20],[392,260,24,20],[514,260,24,20],[771,260,24,20]]}
+    };
+    if(manual[stage]){
+      const cfg=manual[stage];
+      const platforms=[startBlock];
+      cfg.p.forEach(a=>{
+        const [x,y,w,type,phase,range,speed]=a;
+        const extra={};
+        if(type==='move'){extra.phase=phase||0;extra.range=range||30;extra.speed=speed||.8;}
+        platforms.push(mk(x,y,w,type||'solid',extra));
+      });
+      const hazards=(cfg.h||[]).map(a=>({x:a[0],y:a[1],w:a[2],h:a[3],type:'spike'}));
+      return finish(platforms,hazards,cfg.bg||0);
     }
 
-    const platforms=[{x:0,y:baseY,w:150,h:34,type:'solid'}];
+    const tier=Math.floor((stage-1)/10); // 1부터 빠르게 상승, 50대는 매우 빡빡한 정밀 구간
+    const variant=stage%6;
+    const platforms=[startBlock];
     const hazards=[];
-    const count=5+Math.min(10,Math.floor((stage+2)/4));
-    const difficulty=Math.floor((stage-1)/10);
-    const patternSet=[
-      [0,-24,-42,-18,-38,-10],
-      [0,-36,-18,-54,-32,-8],
-      [0,-18,-44,-44,-22,-50],
-      [0,-30,-60,-34,-12,-42],
-      [0,-48,-24,-56,-28,-8]
-    ];
-    const pattern=patternSet[stage%patternSet.length];
-    let cursor=platforms[0].x+platforms[0].w;
+    const count=7+Math.min(9,Math.floor(stage/5));
+    let x=142;
+    let y=baseY-18;
+    const gapBase=88+Math.min(34,stage*.82)+tier*4;
+    const minW=Math.max(38,58-tier*4);
+    const maxW=Math.max(50,82-tier*5);
     for(let i=0;i<count;i++){
-      const rawGap=66+((stage*17+i*23)%36)+difficulty*3;
-      const gap=Math.min(116,rawGap);
-      const w=Math.max(66,104-((stage+i*5)%32)-difficulty*2);
-      const y=baseY-28+pattern[i%pattern.length];
-      cursor+=gap;
+      const wave=((stage*31+i*47)%29)-14;
+      let gap=Math.round(gapBase+wave+(i%3===1?12:0));
+      if(variant===1&&i%2===0)gap+=10;
+      if(variant===3&&i%4===2)gap+=15;
+      gap=Math.max(82,Math.min(142,gap));
+      x+=gap;
+
+      const climb=[-22,-42,-62,-34,-54,-18,-48,-70,-40,-15];
+      const saw=[-16,-48,-20,-58,-26,-66,-30,-52,-18,-60];
+      const drop=[-54,-30,-10,-44,-20,-64,-36,-14,-50,-26];
+      const needle=[-24,-58,-40,-72,-46,-20,-64,-36,-74,-28];
+      const patterns=[climb,saw,drop,needle,climb,needle];
+      const prevY=y;
+      y=baseY+patterns[variant][i%10];
+      if(stage>=35&&i%5===3)y-=12;
+      if(stage>=48&&i%4===1)y-=10;
+      y=Math.max(112,Math.min(238,y));
+      if(prevY-y>42){ const reduce=Math.min(28,Math.ceil((prevY-y-42)*.8)); x-=reduce; }
+
+      let w=maxW-((stage*7+i*11)%Math.max(8,maxW-minW+1));
+      if(stage>=30&&i%3===0)w-=8;
+      if(stage>=45&&i%4===2)w-=10;
+      w=Math.max(minW,w);
+
       let type='solid';
       const extra={};
-      if(stage>=9&&(i+stage)%7===0)type='ice';
-      if(stage>=15&&(i+stage)%8===0)type='spring';
-      if(stage>=22&&(i+stage)%6===0){
+      if(stage>=14&&(i+stage)%5===0)type='ice';
+      if(stage>=18&&(i+stage)%7===0)type='spring';
+      if(stage>=22&&(i+stage)%4===0){
         type='move';
-        extra.phase=(i%4)*0.7;
-        extra.range=18+((stage+i)%3)*8;
-        extra.speed=0.65+((stage+i)%4)*0.12;
+        extra.phase=(i%5)*0.55;
+        extra.range=26+Math.min(34,tier*6+((stage+i)%4)*5);
+        extra.speed=.78+Math.min(.55,tier*.08+((stage+i)%5)*.05);
       }
-      platforms.push(mk(cursor,Math.max(124,Math.min(236,y)),w,type,extra));
-      if(stage>=28&&i%5===2){
-        platforms.push(mk(cursor+18,Math.max(108,Math.min(210,y-52)),Math.max(56,w-22),'solid'));
-      }
-      cursor+=w;
-    }
-    const last=platforms[platforms.length-1];
-    const finalGap=Math.min(112,74+(stage%5)*8+difficulty*2);
-    platforms.push(mk(last.x+last.w+finalGap,Math.max(154,Math.min(224,last.y+((stage%2)?18:-14))),118));
+      if(stage>=42&&(i+stage)%9===0)type='ice';
+      const p=mk(x,y,w,type,extra);
+      platforms.push(p);
 
-    const floorSpikeCount=Math.min(11,Math.floor(stage/5)+1);
-    for(let i=0;i<floorSpikeCount;i++){
-      const hx=235+i*(120+(stage%3)*10)+(stage%4)*11;
-      const endLimit=platforms[platforms.length-1].x-45;
-      if(hx<endLimit)hazards.push({x:hx,y:260,w:24,h:20,type:'spike'});
+      // 플래시 점프맵식: 후반에는 같은 발판 안에서도 안전 착지 영역을 줄임.
+      if(stage>=16&&i%4===1)laneHazard(hazards,p,'right');
+      if(stage>=32&&i%6===4)laneHazard(hazards,p,'left');
+      if(stage>=50&&i%5===2&&p.w>70)hazards.push({x:Math.round(p.x+p.w/2-8),y:p.y-18,w:16,h:18,type:'spike'});
+
+      // 수직 보조 발판: 올라가는 구간을 더 어렵게 만들되 도달 가능한 중간 발판 제공.
+      if(stage>=26&&i%5===0){
+        platforms.push(mk(x+Math.max(22,w-12),Math.max(102,y-54),Math.max(34,w-18),'solid'));
+      }
+      x+=w;
     }
-    if(stage>=19){
-      let placed=0;
-      for(let i=2;i<platforms.length-2&&placed<Math.min(4,Math.floor(stage/12));i+=4){
+
+    const last=platforms[platforms.length-1];
+    const finalGap=Math.min(128,92+tier*4+(stage%4)*4);
+    const finalY=Math.max(120,Math.min(232,last.y+((stage%2)?-18:24)));
+    platforms.push(mk(last.x+last.w+finalGap,finalY,Math.max(44,76-tier*5),stage>=38?'move':'solid',stage>=38?{phase:1.1,range:24+tier*5,speed:.85+tier*.06}:{}));
+
+    const endLimit=platforms[platforms.length-1].x-35;
+    addFloorSpikes(hazards,210,endLimit,Math.min(22,3+Math.floor(stage/3)),stage%5*9);
+    if(stage>=25){
+      for(let i=3;i<platforms.length-3;i+=5){
         const p=platforms[i];
-        if(p&&p.w>=72&&p.type!=='spring'){
-          hazards.push({x:p.x+p.w-24,y:p.y-18,w:20,h:18,type:'spike'});
-          placed++;
-        }
+        if(p&&p.w>40&&p.type!=='spring')laneHazard(hazards,p,(i+stage)%2?'right':'left');
       }
     }
     return finish(platforms,hazards,stage);
