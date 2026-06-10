@@ -2062,6 +2062,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   let jumpStartTime=0;
   let jumpLastTime=0;
   let jumpCameraX=0;
+  let jumpControlPressLock=0;
   let jumpPlayer={x:40,y:40,w:24,h:28,vx:0,vy:0,onGround:false,face:1};
 
   function jumpSafeEl(id){return document.getElementById(id)}
@@ -2075,7 +2076,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     const st=document.createElement('style');
     st.id='jumpStyle';
     st.textContent=`
-      .jump-page{padding-bottom:20px}.jump-wrap{display:flex;flex-direction:column;gap:10px}.jump-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-actions button,.jump-control-btn,.jump-player-btn,.jump-small-btn{border:0;border-radius:14px;background:#f3f4f6;color:#111827;font-weight:950;cursor:pointer}.jump-actions button{min-height:44px;font-size:15px}.jump-stage{background:#111827;border-radius:20px;padding:10px;box-shadow:0 10px 24px rgba(17,24,39,.18)}#jumpCanvas{display:block;width:100%;height:auto;background:#7dd3fc;border-radius:14px;touch-action:none}.jump-info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-info-box{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 11px}.jump-info-box span{display:block;color:#6b7280;font-size:11px;font-weight:850}.jump-info-box b{display:block;margin-top:2px;font-size:17px;font-weight:950;color:#111827}.jump-player-panel,.jump-select-panel{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:14px;box-shadow:0 3px 12px rgba(15,23,42,.05)}.jump-player-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.jump-player-row .input{height:48px}.jump-player-btn{height:48px;padding:0 16px;background:#111827;color:#fff}.jump-player-meta{margin-top:8px;color:#6b7280;font-size:12px;line-height:1.45}.jump-select-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.jump-select-title{font-size:15px;font-weight:950}.jump-small-btn{height:36px;padding:0 12px;font-size:13px}.jump-stage-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.jump-stage-btn{height:42px;border:0;border-radius:13px;background:#f3f4f6;color:#111827;font-weight:950;cursor:pointer}.jump-stage-btn.cleared{background:#dcfce7;color:#166534}.jump-stage-btn.current{background:#111827;color:#fff}.jump-stage-btn.locked{background:#f3f4f6;color:#c4c8d0;cursor:not-allowed}.jump-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-control-btn{min-height:56px;font-size:22px}.jump-control-btn.jump{background:#111827;color:#fff}.jump-help{color:#6b7280;font-size:12px;line-height:1.45;text-align:center}.jump-rank-list{display:flex;flex-direction:column;gap:6px;max-height:210px;overflow:auto}.jump-rank-row{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:13px;padding:8px 10px;font-size:13px}.jump-rank-row b{font-size:14px}.jump-rank-score{font-weight:950}.app-card.jump-card .app-icon{background:#ecfeff}.menu-section-btn.jump-active{background:#111827;color:#fff}@media(max-width:420px){.jump-stage-grid{grid-template-columns:repeat(4,1fr)}.jump-player-row{grid-template-columns:1fr}.jump-player-btn{width:100%}}
+      .jump-page{padding-bottom:20px}.jump-wrap{display:flex;flex-direction:column;gap:10px}.jump-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-actions button,.jump-control-btn,.jump-player-btn,.jump-small-btn{border:0;border-radius:14px;background:#f3f4f6;color:#111827;font-weight:950;cursor:pointer}.jump-actions button{min-height:44px;font-size:15px}.jump-stage{background:#111827;border-radius:20px;padding:10px;box-shadow:0 10px 24px rgba(17,24,39,.18)}#jumpCanvas{display:block;width:100%;height:auto;background:#7dd3fc;border-radius:14px;touch-action:none}.jump-info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-info-box{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 11px}.jump-info-box span{display:block;color:#6b7280;font-size:11px;font-weight:850}.jump-info-box b{display:block;margin-top:2px;font-size:17px;font-weight:950;color:#111827}.jump-player-panel,.jump-select-panel{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:14px;box-shadow:0 3px 12px rgba(15,23,42,.05)}.jump-player-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.jump-player-row .input{height:48px}.jump-player-btn{height:48px;padding:0 16px;background:#111827;color:#fff}.jump-player-meta{margin-top:8px;color:#6b7280;font-size:12px;line-height:1.45}.jump-select-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.jump-select-title{font-size:15px;font-weight:950}.jump-small-btn{height:36px;padding:0 12px;font-size:13px}.jump-stage-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.jump-stage-btn{height:42px;border:0;border-radius:13px;background:#f3f4f6;color:#111827;font-weight:950;cursor:pointer}.jump-stage-btn.cleared{background:#dcfce7;color:#166534}.jump-stage-btn.current{background:#111827;color:#fff}.jump-stage-btn.locked{background:#f3f4f6;color:#c4c8d0;cursor:not-allowed}.jump-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-control-btn{min-height:56px;font-size:22px;touch-action:none;user-select:none;-webkit-user-select:none}.jump-control-btn.jump{background:#111827;color:#fff}.jump-help{color:#6b7280;font-size:12px;line-height:1.45;text-align:center}.jump-rank-list{display:flex;flex-direction:column;gap:6px;max-height:210px;overflow:auto}.jump-rank-row{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:13px;padding:8px 10px;font-size:13px}.jump-rank-row b{font-size:14px}.jump-rank-score{font-weight:950}.app-card.jump-card .app-icon{background:#ecfeff}.menu-section-btn.jump-active{background:#111827;color:#fff}@media(max-width:420px){.jump-stage-grid{grid-template-columns:repeat(4,1fr)}.jump-player-row{grid-template-columns:1fr}.jump-player-btn{width:100%}}
     `;
     document.head.appendChild(st);
   }
@@ -2157,15 +2158,32 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function bindHold(id,key){
     const el=jumpSafeEl(id); if(!el)return;
     const on=e=>{
-      e.preventDefault();
-      jumpTouch[key]=true;
+      if(e&&e.cancelable)e.preventDefault();
       if(key==='jump'){
-        if(!jumpStarted){jumpStart();return;}
-        jumpTryJump();
+        jumpTouch.jump=jumpStarted;
+        jumpStartOrJump();
+        return;
       }
+      jumpTouch[key]=true;
     };
-    const off=e=>{e.preventDefault();jumpTouch[key]=false;};
-    el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);el.addEventListener('pointercancel',off);el.addEventListener('pointerleave',off);
+    const off=e=>{if(e&&e.cancelable)e.preventDefault();jumpTouch[key]=false;};
+    el.addEventListener('pointerdown',on,{passive:false});
+    el.addEventListener('pointerup',off,{passive:false});
+    el.addEventListener('pointercancel',off,{passive:false});
+    el.addEventListener('pointerleave',off,{passive:false});
+    el.addEventListener('touchstart',on,{passive:false});
+    el.addEventListener('touchend',off,{passive:false});
+    el.addEventListener('touchcancel',off,{passive:false});
+    el.addEventListener('mousedown',on);
+    el.addEventListener('mouseup',off);
+    el.addEventListener('click',e=>{
+      if(e&&e.cancelable)e.preventDefault();
+      if(key==='jump'&&!jumpStarted)jumpStart();
+    });
+  }
+  function jumpStartOrJump(){
+    if(jumpStarted){jumpTryJump();return;}
+    jumpStart();
   }
   function jumpIsStartKey(e){return e&&((e.key==='ArrowUp')||(e.key===' ')||(e.key==='Spacebar')||(e.code==='Space')||(e.key==='Space'));}
   function jumpKeyDown(e){
@@ -2176,8 +2194,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(e.key==='ArrowRight')jumpKeys.right=true;
     if(isStartKey){
       jumpKeys.jump=true;
-      if(!jumpStarted){jumpStart();return;}
-      jumpTryJump();
+      jumpHandleJumpControlStart();
     }
     if(e.key==='r'||e.key==='R')jumpRestart();
     if(e.key==='p'||e.key==='P')jumpTogglePause();
