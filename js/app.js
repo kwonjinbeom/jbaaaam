@@ -3144,3 +3144,233 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   window.addEventListener('resize',bambooApplyScrollLockPatch);
   setTimeout(bambooApplyScrollLockPatch,0);
 })();
+
+/* BRICK RPG ADDON - 2026-06-10 */
+(function(){
+  'use strict';
+  const BRICK_NAME_KEY='jbaaaam_brick_player_name_v1';
+  const BRICK_STAGE_KEY='jbaaaam_brick_last_stage_v1';
+  const W=360,H=520;
+  const MAX_STAGE=80;
+  const $b=id=>document.getElementById(id);
+  const html=s=>String(s==null?'':s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+  const nfmt=n=>Number(n||0).toLocaleString('ko-KR');
+  let brickReady=false, brickCtx=null, brickCanvas=null;
+  let brickPlayer=null, brickStage=1, brickState='idle', brickLoopId=null, brickLastTs=0;
+  let brickPaddle=null, brickBalls=[], brickBricks=[], brickParticles=[], brickPowerups=[];
+  let brickKeys={left:false,right:false}, brickScore=0, brickMoneyEarned=0, brickMessage='이름을 입력하고 시작해줘';
+  let brickCleared=false, brickPointerActive=false;
+
+  function toast(msg,type){ if(typeof showToast==='function')showToast(msg,type); else console.log(msg); }
+  function errText(e){return e&&e.message?e.message:String(e||'알 수 없는 오류');}
+  function upgradeCost(key){ const lv=Number(brickPlayer&&brickPlayer[key])||1; const base={paddle_level:80,power_level:120,ball_level:160,pierce_level:220}[key]||100; return Math.round(base*Math.pow(1.55,lv-1)); }
+  function upgradeLabel(key){ return {paddle_level:'패들',power_level:'파워',ball_level:'공',pierce_level:'관통'}[key]||key; }
+  function currentPlayerName(){ return ($b('brickNameInput')&&$b('brickNameInput').value.trim())||localStorage.getItem(BRICK_NAME_KEY)||''; }
+  function playerDefaults(name){ return {name, money:0, max_stage:1, current_stage:1, paddle_level:1, power_level:1, ball_level:1, pierce_level:1}; }
+  async function brickFetchPlayer(name){
+    const rows=await sbFetch(`/brick_players?select=*&name=eq.${encodeURIComponent(name)}&limit=1`);
+    if(rows&&rows[0])return rows[0];
+    const made=await sbFetch('/brick_players',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify(playerDefaults(name))});
+    return made&&made[0]?made[0]:playerDefaults(name);
+  }
+  async function brickSavePlayer(patch={}){
+    if(!brickPlayer||!brickPlayer.id)return;
+    const body={...patch,updated_at:new Date().toISOString()};
+    const rows=await sbFetch(`/brick_players?id=eq.${encodeURIComponent(brickPlayer.id)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(body)});
+    if(rows&&rows[0])brickPlayer={...brickPlayer,...rows[0]}; else brickPlayer={...brickPlayer,...body};
+  }
+  async function brickSaveClear(stageNo,score,money){
+    if(!brickPlayer||!brickPlayer.id)return;
+    await sbFetch('/brick_stage_clears?on_conflict=player_id,stage_no',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({player_id:brickPlayer.id,stage_no:stageNo,score:Math.floor(score),money_earned:Math.floor(money),cleared_at:new Date().toISOString()})});
+  }
+  async function brickLoadPublicStats(){
+    try{
+      const [rank,recent]=await Promise.all([
+        sbFetch('/brick_player_rankings?select=*&order=max_stage.desc,money.desc,updated_at.desc&limit=20'),
+        sbFetch('/brick_recent_clears?select=*&order=cleared_at.desc&limit=12')
+      ]);
+      renderBrickStats(rank||[],recent||[]);
+    }catch(e){
+      const box=$b('brickStatsBox'); if(box)box.innerHTML=`<div class="brick-muted">랭킹을 불러오지 못했어. SQL 실행 여부를 확인해줘.</div>`;
+    }
+  }
+  function ensureBrickUi(){
+    if(brickReady)return;
+    brickReady=true;
+    injectBrickStyle();
+    const homeGrid=document.querySelector('#homeView .home-grid,.home-grid,.game-grid');
+    if(homeGrid&&!$b('homeBrickCard')){
+      const card=document.createElement('button'); card.id='homeBrickCard'; card.type='button'; card.className='home-card game-card';
+      card.innerHTML=`<span class="home-card-icon">🧱</span><strong>벽돌깨기 RPG</strong><small>벽돌 깨고 돈 벌어서 성장하기</small>`;
+      card.onclick=()=>setMainView('brick'); homeGrid.appendChild(card);
+    }
+    const bambooBtn=$b('showBambooBtn')||document.querySelector('[id^="show"][id$="BambooBtn"]');
+    const omokBtn=$b('showOmokBtn');
+    if(!$b('showBrickBtn')){
+      const btn=document.createElement('button'); btn.id='showBrickBtn'; btn.type='button'; btn.className='drawer-btn'; btn.innerHTML='<span>🧱</span> 벽돌깨기 RPG'; btn.onclick=()=>setMainView('brick');
+      (omokBtn||bambooBtn||document.querySelector('.drawer-menu button:last-child'))?.insertAdjacentElement('afterend',btn);
+    }
+    const main=document.querySelector('main')||document.body;
+    if(!$b('brickView')){
+      const view=document.createElement('section'); view.id='brickView'; view.className='view-page brick-page';
+      view.innerHTML=`
+        <div class="game-card brick-shell">
+          <div class="game-header-row">
+            <div><h2>벽돌깨기 RPG</h2><p>공을 튕겨 벽돌을 깨고 돈으로 업그레이드해.</p></div>
+            <button id="brickRankRefreshBtn" class="mini-btn" type="button">랭킹 새로고침</button>
+          </div>
+          <div class="brick-login card-soft">
+            <input id="brickNameInput" class="text-input" maxlength="20" placeholder="이름 입력" />
+            <button id="brickLoadBtn" class="primary-btn" type="button">불러오기</button>
+            <button id="brickNewRunBtn" class="ghost-btn" type="button">현재 스테이지 시작</button>
+          </div>
+          <div class="brick-status-grid">
+            <div><span>이름</span><strong id="brickPlayerName">-</strong></div>
+            <div><span>스테이지</span><strong id="brickStageText">1</strong></div>
+            <div><span>돈</span><strong id="brickMoneyText">0원</strong></div>
+            <div><span>점수</span><strong id="brickScoreText">0</strong></div>
+          </div>
+          <div class="brick-upgrades card-soft">
+            <button id="brickUpPaddle" type="button">패들 Lv.1</button>
+            <button id="brickUpPower" type="button">파워 Lv.1</button>
+            <button id="brickUpBall" type="button">공 Lv.1</button>
+            <button id="brickUpPierce" type="button">관통 Lv.1</button>
+          </div>
+          <div class="brick-stage-tools">
+            <button id="brickPrevStageBtn" type="button">◀ 이전</button>
+            <button id="brickStartBtn" type="button">시작</button>
+            <button id="brickPauseBtn" type="button">일시정지</button>
+            <button id="brickNextStageBtn" type="button">다음 ▶</button>
+          </div>
+          <div class="brick-canvas-wrap"><canvas id="brickCanvas" width="360" height="520"></canvas></div>
+          <div class="brick-mobile-controls">
+            <button id="brickLeftBtn" type="button">←</button>
+            <button id="brickLaunchBtn" type="button">발사/시작</button>
+            <button id="brickRightBtn" type="button">→</button>
+          </div>
+          <div id="brickHelp" class="brick-help">조작: PC ←/→/Space, 모바일 버튼/드래그 · 금색=보너스, 파랑=멀티볼, 보라=관통, 빨강=강한 벽돌</div>
+          <div id="brickStatsBox" class="brick-stats"></div>
+        </div>`;
+      main.appendChild(view);
+    }
+    bindBrickUi();
+  }
+  function injectBrickStyle(){
+    if($b('brickRpgStyle'))return;
+    const st=document.createElement('style'); st.id='brickRpgStyle'; st.textContent=`
+      .brick-page{display:none}.brick-page.active{display:block}.brick-shell{padding:16px}.game-header-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.game-header-row h2{margin:0;font-size:22px}.game-header-row p{margin:5px 0 0;color:#6b7280;font-size:13px;font-weight:800}.card-soft{background:#f8fafc;border:1px solid #e5e7eb;border-radius:18px;padding:12px}.brick-login{display:grid;grid-template-columns:1fr auto auto;gap:8px;margin:12px 0}.text-input{height:42px;border:1px solid #d1d5db;border-radius:12px;padding:0 12px;font-weight:900;min-width:0}.primary-btn,.ghost-btn,.mini-btn,.brick-stage-tools button,.brick-upgrades button,.brick-mobile-controls button{border:0;border-radius:13px;font-weight:950;cursor:pointer}.primary-btn{background:#111827;color:white;padding:0 14px}.ghost-btn,.mini-btn{background:#e5e7eb;color:#111827;padding:0 12px}.mini-btn{height:34px;font-size:12px}.brick-status-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}.brick-status-grid>div{background:#111827;color:#fff;border-radius:16px;padding:10px;text-align:center}.brick-status-grid span{display:block;font-size:11px;color:#cbd5e1;font-weight:800}.brick-status-grid strong{display:block;margin-top:3px;font-size:15px}.brick-upgrades{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.brick-upgrades button{min-height:50px;background:#fff;border:1px solid #dbe3ef;color:#111827;font-size:12px;line-height:1.25}.brick-upgrades button.can-buy{background:#ecfdf5;border-color:#86efac}.brick-stage-tools{display:grid;grid-template-columns:1fr 1.2fr 1.2fr 1fr;gap:8px;margin:10px 0}.brick-stage-tools button{height:42px;background:#111827;color:#fff}.brick-stage-tools button:nth-child(1),.brick-stage-tools button:nth-child(4){background:#374151}.brick-canvas-wrap{background:#020617;border-radius:20px;padding:8px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}#brickCanvas{display:block;width:100%;max-width:420px;height:auto;margin:0 auto;border-radius:14px;background:#020617;touch-action:none}.brick-mobile-controls{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:10px;margin-top:10px}.brick-mobile-controls button{height:52px;background:#111827;color:white;font-size:18px}.brick-help{margin-top:10px;font-size:12px;color:#6b7280;font-weight:800;text-align:center}.brick-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}.brick-stat-panel{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px}.brick-stat-panel h3{margin:0 0 8px;font-size:15px}.brick-rank-row,.brick-recent-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:7px 0;border-top:1px solid #f1f5f9;font-size:12px;font-weight:850}.brick-rank-row:first-of-type,.brick-recent-row:first-of-type{border-top:0}.brick-muted{font-size:12px;color:#6b7280;font-weight:800;text-align:center;padding:12px}.brick-player-highlight{background:#fef9c3;border-radius:10px;padding-left:5px;padding-right:5px}@media(max-width:520px){.brick-login{grid-template-columns:1fr}.brick-status-grid{grid-template-columns:repeat(2,1fr)}.brick-upgrades{grid-template-columns:repeat(2,1fr)}.brick-stats{grid-template-columns:1fr}.brick-stage-tools{grid-template-columns:1fr 1fr}.game-header-row{display:block}.mini-btn{margin-top:8px;width:100%}}
+    `; document.head.appendChild(st);
+  }
+  function bindBrickUi(){
+    if($b('brickLoadBtn').dataset.bound)return;
+    $b('brickLoadBtn').dataset.bound='Y';
+    $b('brickNameInput').value=localStorage.getItem(BRICK_NAME_KEY)||'';
+    $b('brickLoadBtn').onclick=brickLoadByName;
+    $b('brickNewRunBtn').onclick=()=>brickStartStage(brickStage);
+    $b('brickStartBtn').onclick=()=>brickStartStage(brickStage);
+    $b('brickPauseBtn').onclick=brickTogglePause;
+    $b('brickPrevStageBtn').onclick=()=>brickSelectStage(Math.max(1,brickStage-1));
+    $b('brickNextStageBtn').onclick=()=>brickSelectStage(Math.min(getMaxUnlocked(),brickStage+1));
+    $b('brickRankRefreshBtn').onclick=brickLoadPublicStats;
+    $b('brickUpPaddle').onclick=()=>brickBuyUpgrade('paddle_level');
+    $b('brickUpPower').onclick=()=>brickBuyUpgrade('power_level');
+    $b('brickUpBall').onclick=()=>brickBuyUpgrade('ball_level');
+    $b('brickUpPierce').onclick=()=>brickBuyUpgrade('pierce_level');
+    bindHoldButton('brickLeftBtn','left'); bindHoldButton('brickRightBtn','right');
+    $b('brickLaunchBtn').onclick=brickLaunchOrStart;
+    brickCanvas=$b('brickCanvas'); brickCtx=brickCanvas.getContext('2d');
+    brickCanvas.addEventListener('pointerdown',brickPointer,{passive:false});
+    brickCanvas.addEventListener('pointermove',brickPointer,{passive:false});
+    brickCanvas.addEventListener('pointerup',()=>brickPointerActive=false,{passive:false});
+    document.addEventListener('keydown',brickKeyDown);
+    document.addEventListener('keyup',brickKeyUp);
+    brickResetStage(1); brickDraw(); brickLoadPublicStats();
+  }
+  function bindHoldButton(id,key){ const btn=$b(id); btn.addEventListener('pointerdown',e=>{e.preventDefault();brickKeys[key]=true;if(brickState==='idle')brickStartStage(brickStage);},{passive:false}); ['pointerup','pointerleave','pointercancel'].forEach(ev=>btn.addEventListener(ev,()=>brickKeys[key]=false)); }
+  function brickPointer(e){ if(e.cancelable)e.preventDefault(); brickPointerActive=true; const rect=brickCanvas.getBoundingClientRect(); const x=(e.clientX-rect.left)*(W/rect.width); if(brickPaddle)brickPaddle.x=Math.max(brickPaddle.w/2,Math.min(W-brickPaddle.w/2,x)); if(brickState==='idle')brickStartStage(brickStage); }
+  function brickKeyDown(e){ if(currentMainView!=='brick')return; if(typeof isTypingTarget==='function'&&isTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(['arrowleft','arrowright',' ','p','r'].includes(k))e.preventDefault(); if(k==='arrowleft')brickKeys.left=true; else if(k==='arrowright')brickKeys.right=true; else if(k===' ')brickLaunchOrStart(); else if(k==='p')brickTogglePause(); else if(k==='r')brickStartStage(brickStage); }
+  function brickKeyUp(e){ if(currentMainView!=='brick')return; if(typeof isTypingTarget==='function'&&isTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(k==='arrowleft')brickKeys.left=false; else if(k==='arrowright')brickKeys.right=false; }
+  async function brickLoadByName(){
+    const name=currentPlayerName().trim(); if(!name){toast('이름을 입력해줘','error');return;}
+    try{ brickMessage='불러오는 중...'; brickDraw(); brickPlayer=await brickFetchPlayer(name); localStorage.setItem(BRICK_NAME_KEY,name); brickStage=Number(localStorage.getItem(BRICK_STAGE_KEY))||Number(brickPlayer.current_stage)||Number(brickPlayer.max_stage)||1; brickStage=Math.max(1,Math.min(getMaxUnlocked(),brickStage)); brickResetStage(brickStage); renderBrickInfo(); brickLoadPublicStats(); toast('벽돌깨기 세이브 불러옴'); }
+    catch(e){toast('벽돌깨기 불러오기 실패: '+errText(e),'error');}
+  }
+  function getMaxUnlocked(){ return brickPlayer?Math.max(1,Math.min(MAX_STAGE,Number(brickPlayer.max_stage)||1)):1; }
+  function brickSelectStage(no){ brickStage=Math.max(1,Math.min(getMaxUnlocked(),Number(no)||1)); localStorage.setItem(BRICK_STAGE_KEY,String(brickStage)); brickResetStage(brickStage); renderBrickInfo(); }
+  function brickResetStage(stage){
+    brickState='idle'; brickCleared=false; brickScore=0; brickMoneyEarned=0; brickParticles=[]; brickPowerups=[]; brickBricks=makeBrickStage(stage);
+    const paddleLv=Number(brickPlayer&&brickPlayer.paddle_level)||1; const ballLv=Number(brickPlayer&&brickPlayer.ball_level)||1;
+    brickPaddle={x:W/2,y:H-38,w:74+Math.min(54,(paddleLv-1)*10),h:12,speed:285};
+    brickBalls=[]; const count=Math.min(4,ballLv); for(let i=0;i<count;i++)brickBalls.push(makeBall(i,count));
+    brickMessage=brickPlayer?'시작 버튼 또는 Space로 발사':'이름을 입력하고 불러오기';
+    stopBrickLoop(); brickDraw();
+  }
+  function makeBall(i,count){ const spread=(i-(count-1)/2)*0.35; return {x:W/2+(i-(count-1)/2)*12,y:H-56,r:6,vx:95*Math.sin(spread),vy:-255-Number(brickStage||1)*2,stuck:true,pierce:0}; }
+  function makeBrickStage(stage){
+    const rows=Math.min(9,4+Math.floor(stage/8)); const cols=8; const arr=[]; const top=54; const gap=4; const bw=(W-28-gap*(cols-1))/cols; const bh=20;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const seed=(stage*37+r*17+c*23)%100; if(stage>6&&seed<8+(stage%5))continue;
+      let type='normal', hp=1+Math.floor(stage/18), reward=5+Math.floor(stage/4);
+      if(seed>82){type='hard';hp+=1;reward+=8;}
+      if(seed>91){type='gold';reward+=25+stage;}
+      if(stage>5&&seed>=74&&seed<80){type='multi';reward+=10;}
+      if(stage>12&&seed>=66&&seed<70){type='pierce';reward+=12;}
+      if(stage>24&&seed>=58&&seed<62){type='steel';hp+=2;reward+=18;}
+      arr.push({x:14+c*(bw+gap),y:top+r*(bh+gap),w:bw,h:bh,hp,maxHp:hp,type,reward});
+    }
+    return arr;
+  }
+  function brickLaunchOrStart(){ if(!brickPlayer){brickLoadByName();return;} if(brickState==='idle'||brickState==='over'||brickState==='clear')brickStartStage(brickStage); else if(brickState==='ready')brickLaunchBalls(); }
+  function brickStartStage(stage){ if(!brickPlayer){brickLoadByName();return;} brickStage=Math.max(1,Math.min(getMaxUnlocked(),Number(stage)||1)); localStorage.setItem(BRICK_STAGE_KEY,String(brickStage)); brickResetStage(brickStage); brickState='running'; brickLaunchBalls(); startBrickLoop(); }
+  function brickLaunchBalls(){ brickBalls.forEach((b,i)=>{ if(b.stuck){ b.stuck=false; const angle=(-Math.PI/2)+(i-(brickBalls.length-1)/2)*0.22; const speed=270+Math.min(80,brickStage*2); b.vx=Math.cos(angle)*speed; b.vy=Math.sin(angle)*speed; }}); brickMessage=''; }
+  function brickTogglePause(){ if(brickState==='running'){brickState='pause';stopBrickLoop();brickMessage='PAUSE';brickDraw();} else if(brickState==='pause'){brickState='running';brickMessage='';startBrickLoop();} }
+  function startBrickLoop(){ stopBrickLoop(); brickLastTs=0; brickLoopId=requestAnimationFrame(brickLoop); }
+  function stopBrickLoop(){ if(brickLoopId)cancelAnimationFrame(brickLoopId); brickLoopId=null; }
+  function brickLoop(ts){ if(brickState!=='running')return; if(!brickLastTs)brickLastTs=ts; const dt=Math.min(0.028,(ts-brickLastTs)/1000); brickLastTs=ts; updateBrick(dt); brickDraw(); brickLoopId=requestAnimationFrame(brickLoop); }
+  function updateBrick(dt){
+    if(brickKeys.left)brickPaddle.x-=brickPaddle.speed*dt; if(brickKeys.right)brickPaddle.x+=brickPaddle.speed*dt; brickPaddle.x=Math.max(brickPaddle.w/2,Math.min(W-brickPaddle.w/2,brickPaddle.x));
+    const power=Number(brickPlayer&&brickPlayer.power_level)||1; const pierceLv=Number(brickPlayer&&brickPlayer.pierce_level)||1;
+    for(const b of brickBalls){
+      if(b.stuck){b.x=brickPaddle.x;b.y=brickPaddle.y-18;continue;}
+      b.x+=b.vx*dt; b.y+=b.vy*dt; if(b.x<b.r){b.x=b.r;b.vx=Math.abs(b.vx);} if(b.x>W-b.r){b.x=W-b.r;b.vx=-Math.abs(b.vx);} if(b.y<b.r){b.y=b.r;b.vy=Math.abs(b.vy);} 
+      if(b.y>H+28){ b.dead=true; continue; }
+      if(circleRect(b,brickPaddle)&&b.vy>0){ const rel=(b.x-brickPaddle.x)/(brickPaddle.w/2); const speed=Math.hypot(b.vx,b.vy)+3; const angle=(-Math.PI/2)+rel*0.92; b.vx=Math.cos(angle)*speed; b.vy=Math.sin(angle)*speed; b.y=brickPaddle.y-b.r-1; }
+      for(const br of brickBricks){ if(br.dead)continue; if(circleRect(b,br)){ const damage=1+Math.floor((power-1)/2); br.hp-=damage; brickScore+=10*damage; if(b.pierce<=0){ const cx=Math.max(br.x,Math.min(br.x+br.w,b.x)); const cy=Math.max(br.y,Math.min(br.y+br.h,b.y)); if(Math.abs(b.x-cx)>Math.abs(b.y-cy))b.vx*=-1; else b.vy*=-1; } else b.pierce-=1; if(br.hp<=0){ br.dead=true; brickMoneyEarned+=br.reward; brickScore+=br.reward*2; spawnBrickFx(br); handleBrickSpecial(br,b,pierceLv); } break; }}
+    }
+    brickBalls=brickBalls.filter(b=>!b.dead); if(!brickBalls.length){brickState='over';brickMessage='GAME OVER';stopBrickLoop();brickDraw();return;}
+    brickParticles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt;}); brickParticles=brickParticles.filter(p=>p.life>0);
+    if(!brickCleared&&brickBricks.every(b=>b.dead)){ brickClearStage(); }
+  }
+  function circleRect(c,r){ const nx=Math.max(r.x,Math.min(r.x+r.w,c.x)); const ny=Math.max(r.y,Math.min(r.y+r.h,c.y)); return Math.hypot(c.x-nx,c.y-ny)<=c.r; }
+  function handleBrickSpecial(br,ball,pierceLv){ if(br.type==='multi'&&brickBalls.length<8){ const nb={...ball,vx:-ball.vx*0.88,vy:Math.min(-180,ball.vy-30),stuck:false}; brickBalls.push(nb); toast('멀티볼!'); } if(br.type==='pierce'){ ball.pierce+=2+pierceLv; toast('관통!'); } }
+  function spawnBrickFx(br){ for(let i=0;i<5;i++)brickParticles.push({x:br.x+br.w/2,y:br.y+br.h/2,vx:(Math.random()*2-1)*80,vy:(Math.random()*2-1)*80,life:.45,color:brickColor(br)}); }
+  async function brickClearStage(){
+    brickCleared=true; brickState='clear'; stopBrickLoop(); const clearStage=brickStage; const bonus=80+clearStage*16; const earned=brickMoneyEarned+bonus; brickMoneyEarned=earned; brickScore+=bonus*4; brickMessage=`STAGE ${clearStage} CLEAR +${earned}원`; brickDraw();
+    try{ const nextMax=Math.max(Number(brickPlayer.max_stage)||1,Math.min(MAX_STAGE,clearStage+1)); const nextCurrent=Math.min(MAX_STAGE,clearStage+1); await brickSaveClear(clearStage,brickScore,earned); await brickSavePlayer({money:Number(brickPlayer.money||0)+earned,max_stage:nextMax,current_stage:nextCurrent}); brickStage=nextCurrent; localStorage.setItem(BRICK_STAGE_KEY,String(brickStage)); renderBrickInfo(); brickLoadPublicStats(); }
+    catch(e){toast('클리어 저장 실패: '+errText(e),'error');}
+  }
+  async function brickBuyUpgrade(key){ if(!brickPlayer){toast('이름을 먼저 불러와줘','error');return;} const lv=Number(brickPlayer[key])||1; if(lv>=12){toast('최대 레벨이야');return;} const cost=upgradeCost(key); if(Number(brickPlayer.money||0)<cost){toast(`${upgradeLabel(key)} 업그레이드 비용 부족: ${nfmt(cost)}원`,'error');return;} try{ const patch={money:Number(brickPlayer.money||0)-cost}; patch[key]=lv+1; await brickSavePlayer(patch); renderBrickInfo(); brickResetStage(brickStage); toast(`${upgradeLabel(key)} Lv.${lv+1}`); }catch(e){toast('업그레이드 실패: '+errText(e),'error');} }
+  function renderBrickInfo(){
+    if(!$b('brickPlayerName'))return; const p=brickPlayer; $b('brickPlayerName').textContent=p?p.name:'-'; $b('brickStageText').textContent=p?`${brickStage} / ${getMaxUnlocked()}`:'1'; $b('brickMoneyText').textContent=(p?nfmt(p.money):'0')+'원'; $b('brickScoreText').textContent=nfmt(brickScore);
+    const buttons=[['brickUpPaddle','paddle_level'],['brickUpPower','power_level'],['brickUpBall','ball_level'],['brickUpPierce','pierce_level']]; buttons.forEach(([id,key])=>{ const btn=$b(id); if(!btn)return; const lv=Number(p&&p[key])||1; const cost=p?upgradeCost(key):0; btn.innerHTML=`${upgradeLabel(key)} Lv.${lv}<br><small>${lv>=12?'MAX':nfmt(cost)+'원'}</small>`; btn.classList.toggle('can-buy',!!p&&lv<12&&Number(p.money||0)>=cost); });
+  }
+  function renderBrickStats(rank,recent){ const box=$b('brickStatsBox'); if(!box)return; const me=brickPlayer&&brickPlayer.name; box.innerHTML=`<div class="brick-stat-panel"><h3>전체 유저 랭킹</h3>${rank.length?rank.map((r,i)=>`<div class="brick-rank-row ${me&&r.name===me?'brick-player-highlight':''}"><b>${i+1}</b><span>${html(r.name)}<br><small>업그레이드 Lv.${Number(r.total_upgrade_level||0)}</small></span><strong>ST ${Number(r.max_stage||1)}</strong></div>`).join(''):'<div class="brick-muted">아직 랭킹 없음</div>'}</div><div class="brick-stat-panel"><h3>최근 클리어</h3>${recent.length?recent.map(r=>`<div class="brick-recent-row ${me&&r.name===me?'brick-player-highlight':''}"><b>ST ${Number(r.stage_no)}</b><span>${html(r.name)}<br><small>${new Date(r.cleared_at).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></span><strong>${nfmt(r.money_earned)}원</strong></div>`).join(''):'<div class="brick-muted">최근 클리어 없음</div>'}</div>`; }
+  function brickColor(br){ return {normal:'#60a5fa',hard:'#f97316',gold:'#facc15',multi:'#38bdf8',pierce:'#a78bfa',steel:'#94a3b8'}[br.type]||'#60a5fa'; }
+  function brickDraw(){
+    if(!brickCtx)return; const ctx=brickCtx; ctx.clearRect(0,0,W,H); const g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#0f172a'); g.addColorStop(1,'#111827'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(255,255,255,.06)'; for(let i=0;i<18;i++){ctx.beginPath();ctx.arc((i*61+brickStage*13)%W,(i*47)%H,1.4,0,Math.PI*2);ctx.fill();}
+    brickBricks.forEach(br=>{ if(br.dead)return; ctx.fillStyle=brickColor(br); roundRect(ctx,br.x,br.y,br.w,br.h,5,true); ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillRect(br.x+3,br.y+3,br.w-6,3); if(br.hp>1){ctx.fillStyle='#020617';ctx.font='900 11px sans-serif';ctx.textAlign='center';ctx.fillText(br.hp,br.x+br.w/2,br.y+14);} });
+    brickParticles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,3,3);ctx.globalAlpha=1;});
+    if(brickPaddle){ ctx.fillStyle='#f8fafc'; roundRect(ctx,brickPaddle.x-brickPaddle.w/2,brickPaddle.y,brickPaddle.w,brickPaddle.h,8,true); ctx.fillStyle='#22c55e'; roundRect(ctx,brickPaddle.x-brickPaddle.w*.18,brickPaddle.y+2,brickPaddle.w*.36,brickPaddle.h-4,6,true); }
+    brickBalls.forEach(b=>{ctx.fillStyle=b.pierce>0?'#c084fc':'#fefce8';ctx.beginPath();ctx.arc(b.x,b.y,b.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(0,0,0,.2)';ctx.stroke();});
+    ctx.fillStyle='rgba(255,255,255,.92)';ctx.font='900 13px sans-serif';ctx.textAlign='left';ctx.fillText(`STAGE ${brickStage}`,12,24);ctx.textAlign='right';ctx.fillText(`${nfmt(brickScore)}점`,W-12,24);
+    if(brickMessage){ctx.fillStyle='rgba(2,6,23,.72)';roundRect(ctx,34,H/2-38,W-68,76,18,true);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 22px sans-serif';ctx.fillText(brickMessage.split(' ')[0],W/2,H/2-4);ctx.font='800 13px sans-serif';ctx.fillText(brickMessage.replace(brickMessage.split(' ')[0],'').trim(),W/2,H/2+22);} renderBrickInfo();
+  }
+  function roundRect(ctx,x,y,w,h,r,fill){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); if(fill)ctx.fill(); else ctx.stroke(); }
+  function showBrickView(){
+    ensureBrickUi(); currentMainView='brick'; document.querySelectorAll('.view-page').forEach(v=>v.classList.toggle('active',v.id==='brickView')); const add=$b('addBtn'); if(add)add.style.display='none'; ['showBudgetBtn','showTetrisBtn','showDinoBtn','showBambooBtn','showJumpBtn','showOmokBtn','showBrickBtn'].forEach(id=>{const el=$b(id); if(el)el.classList.toggle('active',id==='showBrickBtn');}); if(typeof closeDrawer==='function')closeDrawer(); if(!brickPlayer&&currentPlayerName())brickLoadByName(); else {renderBrickInfo(); brickDraw(); brickLoadPublicStats();}
+  }
+  const oldSetMainView=setMainView;
+  setMainView=function(view){ if(view==='brick'){showBrickView();return;} const r=oldSetMainView(view); const bv=$b('brickView'); if(bv)bv.classList.remove('active'); return r; };
+  setTimeout(ensureBrickUi,0);
+})();
