@@ -3050,3 +3050,82 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   else ensureBudgetBackButton();
   setTimeout(ensureBudgetBackButton,200);
 })();
+
+/* Bamboo joystick screen lock + control cleanup patch */
+(function(){
+  const BAMBOO_SCROLL_LOCK_KEY='jbaaaam_bamboo_scroll_lock_v1';
+  let bambooScrollPatchBound=false;
+  function bambooScrollLockEnabled(){ return localStorage.getItem(BAMBOO_SCROLL_LOCK_KEY)!=='N'; }
+  function bambooSetScrollLockEnabled(on){ localStorage.setItem(BAMBOO_SCROLL_LOCK_KEY,on?'Y':'N'); bambooApplyScrollLockPatch(); }
+  function bambooEnsureScrollPatchCss(){
+    if(document.getElementById('bambooJoystickScrollPatchStyle'))return;
+    const st=document.createElement('style');
+    st.id='bambooJoystickScrollPatchStyle';
+    st.textContent=`
+      .bamboo-joystick-mode .bamboo-button-controls{display:none!important}
+      .bamboo-scroll-toggle{display:none;margin-top:8px;width:100%;height:38px;border:0;border-radius:12px;background:#eef2ff;color:#3730a3;font-weight:950;cursor:pointer}
+      .bamboo-joystick-mode .bamboo-scroll-toggle{display:block}
+      body.bamboo-scroll-locked{overflow:hidden;overscroll-behavior:none;touch-action:none}
+      body.bamboo-scroll-locked #bambooView{overscroll-behavior:none}
+      body.bamboo-scroll-locked #bambooJoystickPad,body.bamboo-scroll-locked #bambooJoystickPad *{touch-action:none}
+    `;
+    document.head.appendChild(st);
+  }
+  function bambooGetButtonControls(){
+    const up=document.getElementById('bambooUpBtn');
+    if(!up)return null;
+    return up.closest('.game-controls')||up.closest('.bamboo-controls')||up.parentElement;
+  }
+  function bambooEnsureControlCleanup(){
+    bambooEnsureScrollPatchCss();
+    const controls=bambooGetButtonControls();
+    if(controls)controls.classList.add('bamboo-button-controls');
+    const panel=document.getElementById('bambooControlPanel');
+    if(panel&&!document.getElementById('bambooScrollLockBtn')){
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.id='bambooScrollLockBtn';
+      btn.className='bamboo-scroll-toggle';
+      btn.onclick=()=>bambooSetScrollLockEnabled(!bambooScrollLockEnabled());
+      panel.appendChild(btn);
+    }
+    if(!bambooScrollPatchBound){
+      bambooScrollPatchBound=true;
+      document.addEventListener('touchmove',e=>{
+        if(!document.body.classList.contains('bamboo-scroll-locked'))return;
+        if(e.target&&e.target.closest&&e.target.closest('#drawerBackdrop.open,.modal-backdrop.open,.modal.open'))return;
+        if(e.cancelable)e.preventDefault();
+      },{passive:false});
+      document.addEventListener('wheel',e=>{
+        if(!document.body.classList.contains('bamboo-scroll-locked'))return;
+        if(e.target&&e.target.closest&&e.target.closest('#drawerBackdrop.open,.modal-backdrop.open,.modal.open'))return;
+        if(e.cancelable)e.preventDefault();
+      },{passive:false});
+    }
+  }
+  function bambooApplyScrollLockPatch(){
+    bambooEnsureControlCleanup();
+    const joystickMode=(typeof bambooControlMode!=='undefined'&&bambooControlMode==='joystick');
+    const isBamboo=(typeof currentMainView!=='undefined'&&currentMainView==='bamboo');
+    const lockOn=joystickMode&&isBamboo&&bambooScrollLockEnabled();
+    document.body.classList.toggle('bamboo-scroll-locked',!!lockOn);
+    const btn=document.getElementById('bambooScrollLockBtn');
+    if(btn)btn.textContent=bambooScrollLockEnabled()?'화면 스크롤 고정 ON':'화면 스크롤 고정 OFF';
+    const controls=bambooGetButtonControls();
+    if(controls)controls.style.display=joystickMode?'none':'';
+  }
+  if(typeof applyBambooControlMode==='function'){
+    const oldApplyBambooControlMode=applyBambooControlMode;
+    applyBambooControlMode=function(){ oldApplyBambooControlMode(); bambooApplyScrollLockPatch(); };
+  }
+  if(typeof setBambooControlMode==='function'){
+    const oldSetBambooControlMode=setBambooControlMode;
+    setBambooControlMode=function(mode){ oldSetBambooControlMode(mode); bambooApplyScrollLockPatch(); };
+  }
+  if(typeof setMainView==='function'){
+    const oldSetMainViewForBambooLock=setMainView;
+    setMainView=function(view){ const r=oldSetMainViewForBambooLock(view); setTimeout(bambooApplyScrollLockPatch,0); return r; };
+  }
+  window.addEventListener('resize',bambooApplyScrollLockPatch);
+  setTimeout(bambooApplyScrollLockPatch,0);
+})();
