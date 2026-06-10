@@ -2160,12 +2160,14 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     const off=e=>{e.preventDefault();jumpTouch[key]=false;};
     el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);el.addEventListener('pointercancel',off);el.addEventListener('pointerleave',off);
   }
+  function jumpIsStartKey(e){return e&&((e.key==='ArrowUp')||(e.key===' ')||(e.key==='Spacebar')||(e.code==='Space')||(e.key==='Space'));}
   function jumpKeyDown(e){
     if(currentMainView!=='jump')return;
-    if(['ArrowLeft','ArrowRight','ArrowUp',' ','r','R','p','P'].includes(e.key))e.preventDefault();
+    const isStartKey=jumpIsStartKey(e);
+    if(['ArrowLeft','ArrowRight','ArrowUp',' ','Spacebar','Space','r','R','p','P'].includes(e.key)||e.code==='Space')e.preventDefault();
     if(e.key==='ArrowLeft')jumpKeys.left=true;
     if(e.key==='ArrowRight')jumpKeys.right=true;
-    if(e.key==='ArrowUp'||e.key===' '){
+    if(isStartKey){
       jumpKeys.jump=true;
       if(!jumpStarted){jumpStart();return;}
       jumpTryJump();
@@ -2176,7 +2178,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function jumpKeyUp(e){
     if(e.key==='ArrowLeft')jumpKeys.left=false;
     if(e.key==='ArrowRight')jumpKeys.right=false;
-    if(e.key==='ArrowUp'||e.key===' ')jumpKeys.jump=false;
+    if(jumpIsStartKey(e))jumpKeys.jump=false;
   }
 
   async function jumpLoadPlayerFromInput(){
@@ -2255,6 +2257,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(!jumpPlayerRecord){jumpLoadPlayerFromInput();return;}
     if(!jumpLevel)jumpSelectStage(jumpStageNo,false);
     jumpStarted=true;jumpPaused=false;jumpClearLock=false;jumpStartTime=performance.now();jumpLastTime=performance.now();
+    jumpKeys.jump=false;jumpTouch.jump=false;
     cancelAnimationFrame(jumpLoopId);jumpLoopId=requestAnimationFrame(jumpLoop);
   }
   function jumpRestart(){jumpSelectStage(jumpStageNo,true)}
@@ -2430,7 +2433,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
       if(rows&&rows[0])jumpPlayerRecord=rows[0];
       jumpUpdateUi();jumpBuildStageGrid();jumpLoadRanks();
       jumpShowToast(`STAGE ${jumpStageNo} 클리어 · +1점`);
-      setTimeout(()=>{jumpSelectStage(lastStage,false);},650);
+      setTimeout(()=>{jumpSelectStage(lastStage,false);jumpDraw();},650);
     }catch(e){console.error(e);jumpShowToast('클리어 저장 실패','error');jumpSetMeta('클리어 저장 실패: '+jumpErr(e));jumpClearLock=false;}
   }
 
@@ -2459,7 +2462,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
       drawPlayer(c,jumpPlayer);
     }
     c.restore();
-    if(!jumpStarted){drawOverlay(c,w,h,jumpPlayerRecord?'시작 버튼을 눌러줘':'이름을 입력하고 시작해줘');}
+    if(!jumpStarted){drawOverlay(c,w,h,jumpPlayerRecord?'Space / ↑ 로 시작':'이름 입력 후 Space / ↑ 로 시작');}
     if(jumpPaused)drawOverlay(c,w,h,'일시정지');
   }
   function drawPlatform(c,p){
