@@ -2156,7 +2156,14 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
 
   function bindHold(id,key){
     const el=jumpSafeEl(id); if(!el)return;
-    const on=e=>{e.preventDefault();jumpTouch[key]=true;if(key==='jump')jumpTryJump();};
+    const on=e=>{
+      e.preventDefault();
+      jumpTouch[key]=true;
+      if(key==='jump'){
+        if(!jumpStarted){jumpStart();return;}
+        jumpTryJump();
+      }
+    };
     const off=e=>{e.preventDefault();jumpTouch[key]=false;};
     el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);el.addEventListener('pointercancel',off);el.addEventListener('pointerleave',off);
   }
@@ -2462,7 +2469,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
       drawPlayer(c,jumpPlayer);
     }
     c.restore();
-    if(!jumpStarted){drawOverlay(c,w,h,jumpPlayerRecord?'Space / ↑ 로 시작':'이름 입력 후 Space / ↑ 로 시작');}
+    if(!jumpStarted){drawOverlay(c,w,h,jumpPlayerRecord?'Space / ↑ / 점프 버튼으로 시작':'이름 입력 후 Space / ↑ / 점프 버튼으로 시작');}
     if(jumpPaused)drawOverlay(c,w,h,'일시정지');
   }
   function drawPlatform(c,p){
