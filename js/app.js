@@ -2165,7 +2165,11 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(['ArrowLeft','ArrowRight','ArrowUp',' ','r','R','p','P'].includes(e.key))e.preventDefault();
     if(e.key==='ArrowLeft')jumpKeys.left=true;
     if(e.key==='ArrowRight')jumpKeys.right=true;
-    if(e.key==='ArrowUp'||e.key===' '){jumpKeys.jump=true;jumpTryJump();}
+    if(e.key==='ArrowUp'||e.key===' '){
+      jumpKeys.jump=true;
+      if(!jumpStarted){jumpStart();return;}
+      jumpTryJump();
+    }
     if(e.key==='r'||e.key==='R')jumpRestart();
     if(e.key==='p'||e.key==='P')jumpTogglePause();
   }
@@ -2258,36 +2262,95 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function jumpResetPlayer(){const s=jumpLevel?jumpLevel.start:{x:40,y:40};jumpPlayer={x:s.x,y:s.y,w:24,h:28,vx:0,vy:0,onGround:false,face:1};}
 
   function jumpGenerateStage(n){
-    const width=760+Math.floor(n/4)*70;
+    const stage=Math.max(1,Math.min(JUMP_TOTAL_STAGES,Number(n)||1));
     const baseY=248;
-    const platforms=[{x:0,y:baseY,w:120,h:34,type:'solid'}];
-    let x=135;
-    let y=baseY-34;
-    const steps=6+Math.min(11,Math.floor(n/3));
-    for(let i=0;i<steps;i++){
-      const gap=62+((n+i*17)%42)+Math.min(22,Math.floor(n/8)*4);
-      x+=gap;
-      y=baseY-42-(((i+n)%4)*28);
-      const w=74-((i+n)%3)*8;
-      let type='solid';
-      if(n>8&&(i+n)%7===0)type='ice';
-      if(n>14&&(i+n)%8===0)type='spring';
-      if(n>20&&(i+n)%6===0)type='move';
-      platforms.push({x,y,w,h:18,type,phase:(i%3)*.9,range:34+((n+i)%3)*16,speed:.8+((n+i)%4)*.16,baseX:x});
-      if(n>28&&i%5===2)platforms.push({x:x+24,y:y-58,w:56,h:16,type:'solid'});
+    const height=300;
+    const mk=(x,y,w,type='solid',extra={})=>({x,y,w,h:18,type,baseX:x,phase:0,range:0,speed:0,...extra});
+    const finish=(platforms,hazards=[],bg=0)=>{
+      platforms.sort((a,b)=>a.x-b.x||a.y-b.y);
+      const last=platforms[platforms.length-1];
+      const width=Math.max(720,last.x+last.w+115);
+      return {no:stage,width,height,baseY,start:{x:34,y:baseY-50},goal:{x:last.x+Math.max(26,last.w-34),y:last.y-42,w:34,h:42},platforms,hazards,bg:bg%4};
+    };
+
+    if(stage===1){
+      return finish([
+        {x:0,y:baseY,w:145,h:34,type:'solid'},
+        mk(228,218,108),mk(388,205,104),mk(555,218,118)
+      ],[],0);
     }
-    platforms.push({x:width-118,y:baseY-70,w:96,h:18,type:'solid'});
+    if(stage===2){
+      return finish([
+        {x:0,y:baseY,w:145,h:34,type:'solid'},
+        mk(218,222,98),mk(370,190,92),mk(522,158,92),mk(676,190,118)
+      ],[],1);
+    }
+    if(stage===3){
+      return finish([
+        {x:0,y:baseY,w:150,h:34,type:'solid'},
+        mk(220,224,112),mk(382,224,92),mk(536,196,104),mk(692,218,122)
+      ],[
+        {x:350,y:260,w:24,h:20,type:'spike'},
+        {x:640,y:260,w:24,h:20,type:'spike'}
+      ],2);
+    }
+
+    const platforms=[{x:0,y:baseY,w:150,h:34,type:'solid'}];
     const hazards=[];
-    for(let i=0;i<Math.min(10,Math.floor(n/4)+1);i++){
-      const hx=210+i*(105+(n%4)*8)+(n%3)*17;
-      if(hx<width-150)hazards.push({x:hx,y:baseY+12,w:26,h:22,type:'spike'});
+    const count=5+Math.min(10,Math.floor((stage+2)/4));
+    const difficulty=Math.floor((stage-1)/10);
+    const patternSet=[
+      [0,-24,-42,-18,-38,-10],
+      [0,-36,-18,-54,-32,-8],
+      [0,-18,-44,-44,-22,-50],
+      [0,-30,-60,-34,-12,-42],
+      [0,-48,-24,-56,-28,-8]
+    ];
+    const pattern=patternSet[stage%patternSet.length];
+    let cursor=platforms[0].x+platforms[0].w;
+    for(let i=0;i<count;i++){
+      const rawGap=66+((stage*17+i*23)%36)+difficulty*3;
+      const gap=Math.min(116,rawGap);
+      const w=Math.max(66,104-((stage+i*5)%32)-difficulty*2);
+      const y=baseY-28+pattern[i%pattern.length];
+      cursor+=gap;
+      let type='solid';
+      const extra={};
+      if(stage>=9&&(i+stage)%7===0)type='ice';
+      if(stage>=15&&(i+stage)%8===0)type='spring';
+      if(stage>=22&&(i+stage)%6===0){
+        type='move';
+        extra.phase=(i%4)*0.7;
+        extra.range=18+((stage+i)%3)*8;
+        extra.speed=0.65+((stage+i)%4)*0.12;
+      }
+      platforms.push(mk(cursor,Math.max(124,Math.min(236,y)),w,type,extra));
+      if(stage>=28&&i%5===2){
+        platforms.push(mk(cursor+18,Math.max(108,Math.min(210,y-52)),Math.max(56,w-22),'solid'));
+      }
+      cursor+=w;
     }
-    if(n>18){
-      for(let i=0;i<Math.min(5,Math.floor(n/10));i++){
-        const p=platforms[2+i*3]; if(p)hazards.push({x:p.x+p.w/2-10,y:p.y-18,w:20,h:18,type:'spike'});
+    const last=platforms[platforms.length-1];
+    const finalGap=Math.min(112,74+(stage%5)*8+difficulty*2);
+    platforms.push(mk(last.x+last.w+finalGap,Math.max(154,Math.min(224,last.y+((stage%2)?18:-14))),118));
+
+    const floorSpikeCount=Math.min(11,Math.floor(stage/5)+1);
+    for(let i=0;i<floorSpikeCount;i++){
+      const hx=235+i*(120+(stage%3)*10)+(stage%4)*11;
+      const endLimit=platforms[platforms.length-1].x-45;
+      if(hx<endLimit)hazards.push({x:hx,y:260,w:24,h:20,type:'spike'});
+    }
+    if(stage>=19){
+      let placed=0;
+      for(let i=2;i<platforms.length-2&&placed<Math.min(4,Math.floor(stage/12));i+=4){
+        const p=platforms[i];
+        if(p&&p.w>=72&&p.type!=='spring'){
+          hazards.push({x:p.x+p.w-24,y:p.y-18,w:20,h:18,type:'spike'});
+          placed++;
+        }
       }
     }
-    return {no:n,width,height:300,baseY,start:{x:34,y:baseY-50},goal:{x:width-82,y:baseY-112,w:34,h:42},platforms,hazards,bg:n%4};
+    return finish(platforms,hazards,stage);
   }
 
   function jumpTryJump(){
