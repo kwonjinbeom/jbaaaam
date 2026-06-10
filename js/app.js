@@ -1229,6 +1229,10 @@ let bambooLevel=1;
 let bambooArrows=[];
 let bambooSpawnTimer=0;
 let bambooKeys={up:false,down:false,left:false,right:false};
+const BAMBOO_CONTROL_KEY="jbaaaam_bamboo_control_mode_v1";
+let bambooControlMode=localStorage.getItem(BAMBOO_CONTROL_KEY)||"buttons";
+let bambooJoystick={active:false,pointerId:null,dx:0,dy:0,strength:0};
+let bambooJoystickBound=false;
 let bambooPlayer={x:360,y:210,r:14,blink:0};
 const BAMBOO_W=720;
 const BAMBOO_H=420;
@@ -1240,6 +1244,9 @@ function initBambooIfNeeded(){
  $("bambooStartBtn").onclick=startBamboo;
  $("bambooPauseBtn").onclick=toggleBambooPause;
  $("bambooRestartBtn").onclick=startBamboo;
+ installBambooControllerUi();
+ applyBambooControlMode();
+ bindBambooJoystick();
 
  bindBambooTouchButton("bambooUpBtn","up");
  bindBambooTouchButton("bambooDownBtn","down");
@@ -1252,9 +1259,129 @@ function initBambooIfNeeded(){
  drawBamboo();
 }
 
+
+function installBambooControllerUi(){
+ if($("bambooControlPanel"))return;
+ const upBtn=$("bambooUpBtn");
+ if(!upBtn)return;
+ const controls=upBtn.closest(".game-controls")||upBtn.closest(".bamboo-controls")||upBtn.parentElement;
+ if(!controls)return;
+ const panel=document.createElement("div");
+ panel.id="bambooControlPanel";
+ panel.className="bamboo-control-panel";
+ panel.innerHTML=`
+   <div class="bamboo-control-title">조작 방식</div>
+   <div class="bamboo-control-choice" role="group" aria-label="죽림고수 조작 방식">
+     <button type="button" id="bambooModeButtons" class="bamboo-mode-btn" data-mode="buttons">방향키</button>
+     <button type="button" id="bambooModeJoystick" class="bamboo-mode-btn" data-mode="joystick">원형 조이스틱</button>
+   </div>
+   <div id="bambooJoystickPad" class="bamboo-joystick-pad" aria-label="죽림고수 원형 조이스틱">
+     <div class="bamboo-joystick-ring"><div id="bambooJoystickKnob" class="bamboo-joystick-knob"></div></div>
+     <div class="bamboo-joystick-hint">동그라미를 원하는 방향으로 밀어서 움직여</div>
+   </div>`;
+ controls.insertAdjacentElement("beforebegin",panel);
+ if(!$("bambooControllerStyle")){
+   const st=document.createElement("style");
+   st.id="bambooControllerStyle";
+   st.textContent=`
+    .bamboo-control-panel{margin:10px 0 8px;background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:12px;box-shadow:0 3px 12px rgba(15,23,42,.05)}
+    .bamboo-control-title{font-size:13px;font-weight:950;color:#374151;margin-bottom:8px;text-align:center}
+    .bamboo-control-choice{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .bamboo-mode-btn{height:40px;border:0;border-radius:13px;background:#f3f4f6;color:#374151;font-weight:950;cursor:pointer}
+    .bamboo-mode-btn.active{background:#111827;color:#fff}
+    .bamboo-joystick-pad{display:none;margin-top:12px;touch-action:none;user-select:none;-webkit-user-select:none;text-align:center}
+    .bamboo-joystick-ring{position:relative;width:132px;height:132px;margin:0 auto;border-radius:50%;background:radial-gradient(circle at 50% 50%,#f8fafc 0,#f8fafc 30%,#e5e7eb 31%,#e5e7eb 100%);border:2px solid #cbd5e1;box-shadow:inset 0 2px 10px rgba(15,23,42,.10),0 6px 16px rgba(15,23,42,.08);touch-action:none}
+    .bamboo-joystick-knob{position:absolute;left:50%;top:50%;width:54px;height:54px;border-radius:50%;transform:translate(-50%,-50%);background:#111827;box-shadow:0 6px 12px rgba(15,23,42,.24);border:4px solid #fff;will-change:transform}
+    .bamboo-joystick-hint{margin-top:8px;font-size:12px;color:#6b7280;font-weight:800}
+    .bamboo-joystick-mode .bamboo-joystick-pad{display:block}
+    .bamboo-joystick-mode #bambooUpBtn,.bamboo-joystick-mode #bambooDownBtn,.bamboo-joystick-mode #bambooLeftBtn,.bamboo-joystick-mode #bambooRightBtn{display:none!important}
+   `;
+   document.head.appendChild(st);
+ }
+ $("bambooModeButtons").onclick=()=>setBambooControlMode("buttons");
+ $("bambooModeJoystick").onclick=()=>setBambooControlMode("joystick");
+}
+
+function setBambooControlMode(mode){
+ bambooControlMode=mode==="joystick"?"joystick":"buttons";
+ localStorage.setItem(BAMBOO_CONTROL_KEY,bambooControlMode);
+ bambooResetJoystick();
+ applyBambooControlMode();
+}
+
+function applyBambooControlMode(){
+ const panel=$("bambooControlPanel");
+ if(panel)panel.classList.toggle("bamboo-joystick-mode",bambooControlMode==="joystick");
+ const b=$("bambooModeButtons"), j=$("bambooModeJoystick");
+ if(b)b.classList.toggle("active",bambooControlMode!=="joystick");
+ if(j)j.classList.toggle("active",bambooControlMode==="joystick");
+}
+
+function bindBambooJoystick(){
+ if(bambooJoystickBound)return;
+ const pad=$("bambooJoystickPad");
+ if(!pad)return;
+ bambooJoystickBound=true;
+ const move=e=>{
+   if(bambooControlMode!=="joystick")return;
+   if(e&&e.cancelable)e.preventDefault();
+   const point=e.touches&&e.touches[0]?e.touches[0]:e;
+   bambooUpdateJoystickFromPoint(point);
+ };
+ const end=e=>{
+   if(e&&e.cancelable)e.preventDefault();
+   bambooResetJoystick();
+ };
+ pad.addEventListener("pointerdown",e=>{
+   if(bambooControlMode!=="joystick")return;
+   if(e&&e.cancelable)e.preventDefault();
+   bambooJoystick.active=true;
+   bambooJoystick.pointerId=e.pointerId;
+   try{pad.setPointerCapture(e.pointerId)}catch{}
+   if(!bambooRunning)startBamboo();
+   bambooUpdateJoystickFromPoint(e);
+ },{passive:false});
+ pad.addEventListener("pointermove",e=>{
+   if(!bambooJoystick.active||bambooJoystick.pointerId!==e.pointerId)return;
+   move(e);
+ },{passive:false});
+ pad.addEventListener("pointerup",end,{passive:false});
+ pad.addEventListener("pointercancel",end,{passive:false});
+ if(!window.PointerEvent){
+   pad.addEventListener("touchstart",e=>{bambooJoystick.active=true;if(!bambooRunning)startBamboo();move(e);},{passive:false});
+   pad.addEventListener("touchmove",move,{passive:false});
+   pad.addEventListener("touchend",end,{passive:false});
+   pad.addEventListener("touchcancel",end,{passive:false});
+ }
+}
+
+function bambooUpdateJoystickFromPoint(point){
+ const ring=$("bambooJoystickPad")&&$("bambooJoystickPad").querySelector(".bamboo-joystick-ring");
+ const knob=$("bambooJoystickKnob");
+ if(!ring||!point)return;
+ const rect=ring.getBoundingClientRect();
+ const cx=rect.left+rect.width/2, cy=rect.top+rect.height/2;
+ const max=rect.width*0.34;
+ let dx=point.clientX-cx, dy=point.clientY-cy;
+ const len=Math.hypot(dx,dy);
+ const clamped=Math.min(max,len||0);
+ const nx=len?dx/len:0, ny=len?dy/len:0;
+ bambooJoystick.active=true;
+ bambooJoystick.dx=nx*(clamped/max);
+ bambooJoystick.dy=ny*(clamped/max);
+ bambooJoystick.strength=clamped/max;
+ if(knob)knob.style.transform=`translate(calc(-50% + ${nx*clamped}px), calc(-50% + ${ny*clamped}px))`;
+}
+
+function bambooResetJoystick(){
+ bambooJoystick={active:false,pointerId:null,dx:0,dy:0,strength:0};
+ const knob=$("bambooJoystickKnob");
+ if(knob)knob.style.transform="translate(-50%,-50%)";
+}
+
 function bindBambooTouchButton(id,key){
  const btn=$(id);
- btn.onpointerdown=e=>{e.preventDefault();bambooKeys[key]=true};
+ btn.onpointerdown=e=>{e.preventDefault();if(bambooControlMode==="joystick")return;if(!bambooRunning)startBamboo();bambooKeys[key]=true};
  btn.onpointerup=e=>{e.preventDefault();bambooKeys[key]=false};
  btn.onpointerleave=e=>{bambooKeys[key]=false};
  btn.onpointercancel=e=>{bambooKeys[key]=false};
@@ -1295,6 +1422,7 @@ function resetBamboo(){
  bambooArrows=[];
  bambooSpawnTimer=0.9;
  bambooKeys={up:false,down:false,left:false,right:false};
+ bambooResetJoystick();
  bambooPlayer={x:BAMBOO_W/2,y:BAMBOO_H/2,r:14,blink:0};
  updateBambooInfo();
 }
@@ -1336,11 +1464,16 @@ function updateBamboo(dt){
  if(bambooKeys.right)dx+=1;
  if(bambooKeys.up)dy-=1;
  if(bambooKeys.down)dy+=1;
+ if(bambooControlMode==="joystick"&&bambooJoystick.active&&bambooJoystick.strength>0.05){
+   dx+=bambooJoystick.dx;
+   dy+=bambooJoystick.dy;
+ }
  if(dx||dy){
    const len=Math.hypot(dx,dy);
    dx/=len;dy/=len;
-   bambooPlayer.x+=dx*moveSpeed*dt;
-   bambooPlayer.y+=dy*moveSpeed*dt;
+   const analog=(bambooControlMode==="joystick"&&bambooJoystick.active)?Math.max(0.35,Math.min(1,bambooJoystick.strength)):1;
+   bambooPlayer.x+=dx*moveSpeed*analog*dt;
+   bambooPlayer.y+=dy*moveSpeed*analog*dt;
  }
  bambooPlayer.x=Math.max(34,Math.min(BAMBOO_W-34,bambooPlayer.x));
  bambooPlayer.y=Math.max(38,Math.min(BAMBOO_H-38,bambooPlayer.y));
@@ -1520,7 +1653,7 @@ function drawBamboo(){
    ctx.textAlign="center";
    ctx.fillText(bambooScoreValue>0?"GAME OVER":"START",BAMBOO_W/2,165);
    ctx.font="800 13px Pretendard, sans-serif";
-   ctx.fillText("방향키/WASD로 이동해서 화살을 피해",BAMBOO_W/2,193);
+   ctx.fillText(bambooControlMode==="joystick"?"원형 조이스틱을 밀어서 화살을 피해":"방향키/WASD로 이동해서 화살을 피해",BAMBOO_W/2,193);
  }
  if(bambooPaused){
    ctx.fillStyle="rgba(17,24,39,.82)";
