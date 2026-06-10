@@ -2039,3 +2039,425 @@ async function submitGuestbookReply(parentId,form){
 // 메뉴 정리 후 현재 화면 활성 상태 보정
 setMainView(currentMainView||"home");
 setTimeout(()=>loadGuestbook({silent:true}),500);
+
+/* Jump Map game: Supabase stage-save add-on */
+(function(){
+  const JUMP_TOTAL_STAGES=60;
+  const JUMP_PLAYER_CACHE_KEY='jbaaaam_jump_last_player_v1';
+  const JUMP_SCALE=1;
+  let jumpReady=false;
+  let jumpCtx=null;
+  let jumpCanvas=null;
+  let jumpLoopId=0;
+  let jumpKeys={left:false,right:false,jump:false};
+  let jumpTouch={left:false,right:false,jump:false};
+  let jumpPlayerRecord=null;
+  let jumpClears=[];
+  let jumpStageNo=1;
+  let jumpLevel=null;
+  let jumpStarted=false;
+  let jumpPaused=false;
+  let jumpClearLock=false;
+  let jumpDeaths=0;
+  let jumpStartTime=0;
+  let jumpLastTime=0;
+  let jumpCameraX=0;
+  let jumpPlayer={x:40,y:40,w:24,h:28,vx:0,vy:0,onGround:false,face:1};
+
+  function jumpSafeEl(id){return document.getElementById(id)}
+  function jumpHtml(t){return String(t==null?'':t).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
+  function jumpShowToast(msg,type){ if(typeof showToast==='function')showToast(msg,type); else console.log(msg); }
+  function jumpErr(e){ return typeof shortErrorText==='function'?shortErrorText(e):String(e&&e.message?e.message:e); }
+  function jumpDateText(iso){ if(typeof formatScoreDate==='function')return formatScoreDate(iso); const d=new Date(iso); return Number.isNaN(d.getTime())?'':`${d.getMonth()+1}/${d.getDate()}`; }
+
+  function installJumpStyle(){
+    if(jumpSafeEl('jumpStyle'))return;
+    const st=document.createElement('style');
+    st.id='jumpStyle';
+    st.textContent=`
+      .jump-page{padding-bottom:20px}.jump-wrap{display:flex;flex-direction:column;gap:10px}.jump-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-actions button,.jump-control-btn,.jump-player-btn,.jump-small-btn{border:0;border-radius:14px;background:#f3f4f6;color:#111827;font-weight:950;cursor:pointer}.jump-actions button{min-height:44px;font-size:15px}.jump-stage{background:#111827;border-radius:20px;padding:10px;box-shadow:0 10px 24px rgba(17,24,39,.18)}#jumpCanvas{display:block;width:100%;height:auto;background:#7dd3fc;border-radius:14px;touch-action:none}.jump-info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-info-box{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:10px 11px}.jump-info-box span{display:block;color:#6b7280;font-size:11px;font-weight:850}.jump-info-box b{display:block;margin-top:2px;font-size:17px;font-weight:950;color:#111827}.jump-player-panel,.jump-select-panel{background:#fff;border:1px solid #e5e7eb;border-radius:20px;padding:14px;box-shadow:0 3px 12px rgba(15,23,42,.05)}.jump-player-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}.jump-player-row .input{height:48px}.jump-player-btn{height:48px;padding:0 16px;background:#111827;color:#fff}.jump-player-meta{margin-top:8px;color:#6b7280;font-size:12px;line-height:1.45}.jump-select-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}.jump-select-title{font-size:15px;font-weight:950}.jump-small-btn{height:36px;padding:0 12px;font-size:13px}.jump-stage-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.jump-stage-btn{height:42px;border:0;border-radius:13px;background:#f3f4f6;color:#111827;font-weight:950;cursor:pointer}.jump-stage-btn.cleared{background:#dcfce7;color:#166534}.jump-stage-btn.current{background:#111827;color:#fff}.jump-stage-btn.locked{background:#f3f4f6;color:#c4c8d0;cursor:not-allowed}.jump-controls{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.jump-control-btn{min-height:56px;font-size:22px}.jump-control-btn.jump{background:#111827;color:#fff}.jump-help{color:#6b7280;font-size:12px;line-height:1.45;text-align:center}.jump-rank-list{display:flex;flex-direction:column;gap:6px;max-height:210px;overflow:auto}.jump-rank-row{display:grid;grid-template-columns:34px 1fr auto;gap:8px;align-items:center;background:#f9fafb;border:1px solid #e5e7eb;border-radius:13px;padding:8px 10px;font-size:13px}.jump-rank-row b{font-size:14px}.jump-rank-score{font-weight:950}.app-card.jump-card .app-icon{background:#ecfeff}.menu-section-btn.jump-active{background:#111827;color:#fff}@media(max-width:420px){.jump-stage-grid{grid-template-columns:repeat(4,1fr)}.jump-player-row{grid-template-columns:1fr}.jump-player-btn{width:100%}}
+    `;
+    document.head.appendChild(st);
+  }
+
+  function installJumpDom(){
+    installJumpStyle();
+    const app=document.querySelector('.app')||document.body;
+    const grid=document.querySelector('#homeView .app-grid')||document.querySelector('.app-grid');
+    if(grid&&!jumpSafeEl('homeJumpCard')){
+      const card=document.createElement('button');
+      card.type='button';
+      card.id='homeJumpCard';
+      card.className='app-card jump-card';
+      card.innerHTML='<div class="app-icon">🧊</div><div><div class="app-name">점프맵</div><div class="app-desc">스테이지 점프 클리어</div></div>';
+      card.onclick=()=>setMainView('jump');
+      grid.appendChild(card);
+    }
+    const bambooBtn=jumpSafeEl('showBambooBtn');
+    if(bambooBtn&&!jumpSafeEl('showJumpBtn')){
+      const btn=document.createElement('button');
+      btn.type='button';
+      btn.id='showJumpBtn';
+      btn.className='menu-section-btn';
+      btn.innerHTML='점프맵<br><span style="font-size:12px;font-weight:700;color:inherit;opacity:.72">스테이지 점프</span>';
+      btn.onclick=()=>setMainView('jump');
+      bambooBtn.insertAdjacentElement('afterend',btn);
+    }
+    if(!jumpSafeEl('jumpView')){
+      const view=document.createElement('section');
+      view.id='jumpView';
+      view.className='view-page jump-page';
+      view.innerHTML=`
+        <div class="header"><button class="menu-btn" id="menuBtnJump" type="button">☰</button><div class="title-area"><div class="title">점프맵</div><div class="subtitle">블록을 밟고 목표 지점까지 가는 스테이지 점프 게임</div></div><button class="name-btn" id="jumpRankBtn" type="button">랭킹</button></div>
+        <div class="jump-wrap">
+          <div class="jump-player-panel">
+            <div class="jump-player-row"><input id="jumpNameInput" class="input" maxlength="20" placeholder="이름을 입력해줘"><button class="jump-player-btn" id="jumpLoadPlayerBtn" type="button">시작</button></div>
+            <div class="jump-player-meta" id="jumpPlayerMeta">이름별로 Supabase에 진행도가 저장돼.</div>
+          </div>
+          <div class="jump-actions"><button id="jumpStartBtn" type="button">시작</button><button id="jumpPauseBtn" type="button">일시정지</button><button id="jumpRestartBtn" type="button">다시시작</button></div>
+          <div class="jump-info"><div class="jump-info-box"><span>플레이어</span><b id="jumpPlayerName">-</b></div><div class="jump-info-box"><span>점수</span><b id="jumpScore">0</b></div><div class="jump-info-box"><span>스테이지</span><b id="jumpStageText">1</b></div></div>
+          <div class="jump-select-panel"><div class="jump-select-head"><div class="jump-select-title">스테이지 선택</div><button class="jump-small-btn" id="jumpContinueBtn" type="button">이어하기</button></div><div class="jump-stage-grid" id="jumpStageGrid"></div></div>
+          <div class="jump-stage"><canvas id="jumpCanvas" width="460" height="300"></canvas></div>
+          <div class="jump-controls"><button class="jump-control-btn" id="jumpLeftBtn" type="button">←</button><button class="jump-control-btn jump" id="jumpJumpBtn" type="button">점프</button><button class="jump-control-btn" id="jumpRightBtn" type="button">→</button></div>
+          <div class="jump-help">PC: ←/→ 이동, ↑/Space 점프, R 다시시작, P 일시정지<br>폰: 아래 버튼을 누르고 있으면 이동해.</div>
+          <div class="jump-select-panel"><div class="jump-select-head"><div class="jump-select-title">진행도 랭킹</div><button class="jump-small-btn" id="jumpRefreshRankBtn" type="button">새로고침</button></div><div class="jump-rank-list" id="jumpRankList"><div class="empty">랭킹 불러오기 전</div></div></div>
+        </div>`;
+      const anchor=jumpSafeEl('bambooView')||document.querySelector('.view-page:last-of-type');
+      if(anchor&&anchor.parentNode)anchor.insertAdjacentElement('afterend',view); else app.appendChild(view);
+    }
+  }
+
+  function bindJump(){
+    if(jumpReady)return;
+    jumpReady=true;
+    jumpCanvas=jumpSafeEl('jumpCanvas');
+    jumpCtx=jumpCanvas.getContext('2d');
+    const last=localStorage.getItem(JUMP_PLAYER_CACHE_KEY)||'';
+    const nameInput=jumpSafeEl('jumpNameInput');
+    if(nameInput)nameInput.value=last;
+    jumpSafeEl('menuBtnJump').onclick=openDrawer;
+    jumpSafeEl('jumpLoadPlayerBtn').onclick=()=>jumpLoadPlayerFromInput();
+    jumpSafeEl('jumpStartBtn').onclick=()=>jumpStart();
+    jumpSafeEl('jumpPauseBtn').onclick=()=>jumpTogglePause();
+    jumpSafeEl('jumpRestartBtn').onclick=()=>jumpRestart();
+    jumpSafeEl('jumpContinueBtn').onclick=()=>jumpContinue();
+    jumpSafeEl('jumpRankBtn').onclick=()=>jumpLoadRanks();
+    jumpSafeEl('jumpRefreshRankBtn').onclick=()=>jumpLoadRanks();
+    if(nameInput)nameInput.addEventListener('keydown',e=>{if(e.key==='Enter')jumpLoadPlayerFromInput()});
+    bindHold('jumpLeftBtn','left');bindHold('jumpRightBtn','right');bindHold('jumpJumpBtn','jump');
+    document.addEventListener('keydown',jumpKeyDown);
+    document.addEventListener('keyup',jumpKeyUp);
+    jumpBuildStageGrid();
+    jumpLoadRanks();
+    if(last)jumpLoadPlayer(last,{silent:true});
+    else jumpSelectStage(1,false);
+    jumpDraw();
+  }
+
+  function bindHold(id,key){
+    const el=jumpSafeEl(id); if(!el)return;
+    const on=e=>{e.preventDefault();jumpTouch[key]=true;if(key==='jump')jumpTryJump();};
+    const off=e=>{e.preventDefault();jumpTouch[key]=false;};
+    el.addEventListener('pointerdown',on);el.addEventListener('pointerup',off);el.addEventListener('pointercancel',off);el.addEventListener('pointerleave',off);
+  }
+  function jumpKeyDown(e){
+    if(currentMainView!=='jump')return;
+    if(['ArrowLeft','ArrowRight','ArrowUp',' ','r','R','p','P'].includes(e.key))e.preventDefault();
+    if(e.key==='ArrowLeft')jumpKeys.left=true;
+    if(e.key==='ArrowRight')jumpKeys.right=true;
+    if(e.key==='ArrowUp'||e.key===' '){jumpKeys.jump=true;jumpTryJump();}
+    if(e.key==='r'||e.key==='R')jumpRestart();
+    if(e.key==='p'||e.key==='P')jumpTogglePause();
+  }
+  function jumpKeyUp(e){
+    if(e.key==='ArrowLeft')jumpKeys.left=false;
+    if(e.key==='ArrowRight')jumpKeys.right=false;
+    if(e.key==='ArrowUp'||e.key===' ')jumpKeys.jump=false;
+  }
+
+  async function jumpLoadPlayerFromInput(){
+    const name=(jumpSafeEl('jumpNameInput').value||'').trim();
+    if(!name){jumpSafeEl('jumpNameInput').focus();jumpShowToast('이름을 입력해줘','error');return;}
+    await jumpLoadPlayer(name,{silent:false});
+  }
+  async function jumpLoadPlayer(name,{silent=false}={}){
+    try{
+      jumpSetMeta('플레이어 불러오는 중...');
+      const clean=String(name||'').trim().slice(0,20)||'익명';
+      let rows=await sbFetch(`/jump_players?select=id,name,unlocked_stage,score,last_stage,created_at,updated_at&name=eq.${encodeURIComponent(clean)}&limit=1`);
+      if(!rows||!rows.length){
+        await sbFetch('/jump_players?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify([{name:clean,unlocked_stage:1,score:0,last_stage:1}])});
+        rows=await sbFetch(`/jump_players?select=id,name,unlocked_stage,score,last_stage,created_at,updated_at&name=eq.${encodeURIComponent(clean)}&limit=1`);
+      }
+      jumpPlayerRecord=rows[0];
+      localStorage.setItem(JUMP_PLAYER_CACHE_KEY,jumpPlayerRecord.name);
+      jumpClears=await jumpFetchClears(jumpPlayerRecord.id);
+      const unlocked=Math.max(1,Math.min(JUMP_TOTAL_STAGES,Number(jumpPlayerRecord.unlocked_stage)||1));
+      const target=Math.max(1,Math.min(unlocked,Number(jumpPlayerRecord.last_stage)||unlocked));
+      jumpSelectStage(target,false);
+      jumpUpdateUi();
+      jumpBuildStageGrid();
+      jumpSetMeta(`${jumpPlayerRecord.name} · ${jumpClears.length}개 클리어 · ${unlocked}스테이지까지 열림`);
+      if(!silent)jumpShowToast('점프맵 세이브 불러오기 완료');
+    }catch(e){console.error(e);jumpSetMeta('Supabase 불러오기 실패: '+jumpErr(e));jumpShowToast('점프맵 불러오기 실패','error');}
+  }
+  async function jumpFetchClears(playerId){
+    if(!playerId)return [];
+    const rows=await sbFetch(`/jump_stage_clears?select=stage_no,best_time_ms,deaths,clear_count,cleared_at,updated_at&player_id=eq.${encodeURIComponent(playerId)}&order=stage_no.asc&limit=1000`);
+    return Array.isArray(rows)?rows:[];
+  }
+  function jumpClearedSet(){return new Set((jumpClears||[]).map(r=>Number(r.stage_no)).filter(Boolean));}
+  function jumpGetScore(){return jumpClearedSet().size;}
+  function jumpGetUnlocked(){
+    const db=jumpPlayerRecord?Number(jumpPlayerRecord.unlocked_stage)||1:1;
+    const local=Math.min(JUMP_TOTAL_STAGES,jumpGetScore()+1);
+    return Math.max(1,Math.min(JUMP_TOTAL_STAGES,Math.max(db,local)));
+  }
+  function jumpUpdateUi(){
+    const name=jumpPlayerRecord?jumpPlayerRecord.name:'-';
+    const score=jumpGetScore();
+    const unlocked=jumpGetUnlocked();
+    if(jumpSafeEl('jumpPlayerName'))jumpSafeEl('jumpPlayerName').textContent=name;
+    if(jumpSafeEl('jumpScore'))jumpSafeEl('jumpScore').textContent=String(score);
+    if(jumpSafeEl('jumpStageText'))jumpSafeEl('jumpStageText').textContent=`${jumpStageNo} / ${JUMP_TOTAL_STAGES}`;
+    if(jumpPlayerRecord)jumpSetMeta(`${name} · 점수 ${score}점 · ${unlocked}스테이지까지 열림`);
+  }
+  function jumpSetMeta(text){const el=jumpSafeEl('jumpPlayerMeta');if(el)el.textContent=text;}
+
+  function jumpBuildStageGrid(){
+    const grid=jumpSafeEl('jumpStageGrid'); if(!grid)return;
+    const cleared=jumpClearedSet(); const unlocked=jumpGetUnlocked();
+    grid.innerHTML='';
+    for(let i=1;i<=JUMP_TOTAL_STAGES;i++){
+      const btn=document.createElement('button');
+      btn.type='button';btn.className='jump-stage-btn';btn.textContent=String(i);
+      const isCleared=cleared.has(i), isCurrent=i===jumpStageNo, isLocked=i>unlocked;
+      btn.classList.toggle('cleared',isCleared);btn.classList.toggle('current',isCurrent);btn.classList.toggle('locked',isLocked);
+      btn.disabled=isLocked;
+      btn.onclick=()=>jumpSelectStage(i,true);
+      grid.appendChild(btn);
+    }
+  }
+  function jumpSelectStage(stageNo,startNow=true){
+    jumpStageNo=Math.max(1,Math.min(JUMP_TOTAL_STAGES,Number(stageNo)||1));
+    jumpLevel=jumpGenerateStage(jumpStageNo);
+    jumpResetPlayer();
+    jumpStarted=false;jumpPaused=false;jumpClearLock=false;jumpCameraX=0;jumpDeaths=0;
+    jumpBuildStageGrid();jumpUpdateUi();jumpDraw();
+    if(startNow)jumpStart();
+  }
+  function jumpContinue(){jumpSelectStage(jumpGetUnlocked(),true)}
+  function jumpStart(){
+    if(!jumpPlayerRecord){jumpLoadPlayerFromInput();return;}
+    if(!jumpLevel)jumpSelectStage(jumpStageNo,false);
+    jumpStarted=true;jumpPaused=false;jumpClearLock=false;jumpStartTime=performance.now();jumpLastTime=performance.now();
+    cancelAnimationFrame(jumpLoopId);jumpLoopId=requestAnimationFrame(jumpLoop);
+  }
+  function jumpRestart(){jumpSelectStage(jumpStageNo,true)}
+  function jumpTogglePause(){if(!jumpStarted)return;jumpPaused=!jumpPaused;if(!jumpPaused){jumpLastTime=performance.now();jumpLoopId=requestAnimationFrame(jumpLoop)}jumpDraw();}
+  function jumpResetPlayer(){const s=jumpLevel?jumpLevel.start:{x:40,y:40};jumpPlayer={x:s.x,y:s.y,w:24,h:28,vx:0,vy:0,onGround:false,face:1};}
+
+  function jumpGenerateStage(n){
+    const width=760+Math.floor(n/4)*70;
+    const baseY=248;
+    const platforms=[{x:0,y:baseY,w:120,h:34,type:'solid'}];
+    let x=135;
+    let y=baseY-34;
+    const steps=6+Math.min(11,Math.floor(n/3));
+    for(let i=0;i<steps;i++){
+      const gap=62+((n+i*17)%42)+Math.min(22,Math.floor(n/8)*4);
+      x+=gap;
+      y=baseY-42-(((i+n)%4)*28);
+      const w=74-((i+n)%3)*8;
+      let type='solid';
+      if(n>8&&(i+n)%7===0)type='ice';
+      if(n>14&&(i+n)%8===0)type='spring';
+      if(n>20&&(i+n)%6===0)type='move';
+      platforms.push({x,y,w,h:18,type,phase:(i%3)*.9,range:34+((n+i)%3)*16,speed:.8+((n+i)%4)*.16,baseX:x});
+      if(n>28&&i%5===2)platforms.push({x:x+24,y:y-58,w:56,h:16,type:'solid'});
+    }
+    platforms.push({x:width-118,y:baseY-70,w:96,h:18,type:'solid'});
+    const hazards=[];
+    for(let i=0;i<Math.min(10,Math.floor(n/4)+1);i++){
+      const hx=210+i*(105+(n%4)*8)+(n%3)*17;
+      if(hx<width-150)hazards.push({x:hx,y:baseY+12,w:26,h:22,type:'spike'});
+    }
+    if(n>18){
+      for(let i=0;i<Math.min(5,Math.floor(n/10));i++){
+        const p=platforms[2+i*3]; if(p)hazards.push({x:p.x+p.w/2-10,y:p.y-18,w:20,h:18,type:'spike'});
+      }
+    }
+    return {no:n,width,height:300,baseY,start:{x:34,y:baseY-50},goal:{x:width-82,y:baseY-112,w:34,h:42},platforms,hazards,bg:n%4};
+  }
+
+  function jumpTryJump(){
+    if(!jumpStarted||jumpPaused)return;
+    if(jumpPlayer.onGround){jumpPlayer.vy=-440;jumpPlayer.onGround=false;}
+  }
+  function jumpLoop(t){
+    if(!jumpStarted||jumpPaused){jumpDraw();return;}
+    const dt=Math.min(.033,(t-jumpLastTime)/1000||.016);jumpLastTime=t;
+    jumpUpdate(dt,t/1000);
+    jumpDraw();
+    jumpLoopId=requestAnimationFrame(jumpLoop);
+  }
+  function jumpUpdate(dt,time){
+    const left=jumpKeys.left||jumpTouch.left, right=jumpKeys.right||jumpTouch.right;
+    const accel=left?-1500:right?1500:0;
+    const maxSpeed=left||right?190:0;
+    const friction=jumpPlayer.onGround?1350:620;
+    if(accel){jumpPlayer.vx+=accel*dt;jumpPlayer.face=accel>0?1:-1;} else {
+      if(jumpPlayer.vx>0)jumpPlayer.vx=Math.max(0,jumpPlayer.vx-friction*dt);
+      if(jumpPlayer.vx<0)jumpPlayer.vx=Math.min(0,jumpPlayer.vx+friction*dt);
+    }
+    if(maxSpeed)jumpPlayer.vx=Math.max(-maxSpeed,Math.min(maxSpeed,jumpPlayer.vx));
+    jumpPlayer.vy+=900*dt;
+    jumpMovePlatforms(time);
+    jumpMoveAxis('x',jumpPlayer.vx*dt);
+    jumpPlayer.onGround=false;
+    jumpMoveAxis('y',jumpPlayer.vy*dt);
+    if(jumpPlayer.y>jumpLevel.height+120)jumpDie();
+    for(const h of jumpLevel.hazards){if(rectHit(jumpPlayer,h)){jumpDie();return;}}
+    if(rectHit(jumpPlayer,jumpLevel.goal))jumpClearStage();
+    const target=Math.max(0,Math.min(jumpLevel.width-jumpCanvas.width,jumpPlayer.x-jumpCanvas.width*.38));
+    jumpCameraX+=((target||0)-jumpCameraX)*Math.min(1,dt*6);
+  }
+  function jumpMovePlatforms(time){
+    jumpLevel.platforms.forEach(p=>{
+      if(p.type==='move')p.x=p.baseX+Math.sin(time*p.speed+p.phase)*p.range;
+    });
+  }
+  function jumpMoveAxis(axis,amount){
+    jumpPlayer[axis]+=amount;
+    for(const p of jumpLevel.platforms){
+      if(!rectHit(jumpPlayer,p))continue;
+      if(axis==='x'){
+        if(amount>0)jumpPlayer.x=p.x-jumpPlayer.w;
+        else if(amount<0)jumpPlayer.x=p.x+p.w;
+        jumpPlayer.vx=0;
+      }else{
+        if(amount>0){
+          jumpPlayer.y=p.y-jumpPlayer.h;jumpPlayer.vy=0;jumpPlayer.onGround=true;
+          if(p.type==='spring'){jumpPlayer.vy=-620;jumpPlayer.onGround=false;}
+          if(p.type==='ice')jumpPlayer.vx*=1.018;
+        }else if(amount<0){jumpPlayer.y=p.y+p.h;jumpPlayer.vy=40;}
+      }
+    }
+    if(jumpPlayer.x<0){jumpPlayer.x=0;jumpPlayer.vx=0;}
+    if(jumpPlayer.x+jumpPlayer.w>jumpLevel.width){jumpPlayer.x=jumpLevel.width-jumpPlayer.w;jumpPlayer.vx=0;}
+  }
+  function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+  function jumpDie(){jumpDeaths++;jumpResetPlayer();jumpCameraX=Math.max(0,jumpPlayer.x-80);jumpShowToast('다시 도전');}
+  async function jumpClearStage(){
+    if(jumpClearLock||!jumpPlayerRecord)return;
+    jumpClearLock=true;jumpStarted=false;cancelAnimationFrame(jumpLoopId);
+    const elapsed=Math.max(1,Math.round(performance.now()-jumpStartTime));
+    try{
+      const old=(jumpClears||[]).find(r=>Number(r.stage_no)===jumpStageNo);
+      const best=old&&old.best_time_ms?Math.min(Number(old.best_time_ms),elapsed):elapsed;
+      const deaths=(old?Number(old.deaths)||0:0)+jumpDeaths;
+      const clearCount=(old?Number(old.clear_count)||0:0)+1;
+      await sbFetch('/jump_stage_clears?on_conflict=player_id,stage_no',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify([{player_id:jumpPlayerRecord.id,stage_no:jumpStageNo,best_time_ms:best,deaths,clear_count:clearCount,cleared_at:new Date().toISOString(),updated_at:new Date().toISOString()}])});
+      jumpClears=await jumpFetchClears(jumpPlayerRecord.id);
+      const score=jumpGetScore();
+      const unlocked=Math.min(JUMP_TOTAL_STAGES,Math.max(jumpGetUnlocked(),jumpStageNo+1));
+      const lastStage=Math.min(JUMP_TOTAL_STAGES,jumpStageNo+1);
+      await sbFetch('/jump_players?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify([{id:jumpPlayerRecord.id,name:jumpPlayerRecord.name,score,unlocked_stage:unlocked,last_stage:lastStage,updated_at:new Date().toISOString()}])});
+      const rows=await sbFetch(`/jump_players?select=id,name,unlocked_stage,score,last_stage,created_at,updated_at&id=eq.${encodeURIComponent(jumpPlayerRecord.id)}&limit=1`);
+      if(rows&&rows[0])jumpPlayerRecord=rows[0];
+      jumpUpdateUi();jumpBuildStageGrid();jumpLoadRanks();
+      jumpShowToast(`STAGE ${jumpStageNo} 클리어 · +1점`);
+      setTimeout(()=>{jumpSelectStage(lastStage,false);},650);
+    }catch(e){console.error(e);jumpShowToast('클리어 저장 실패','error');jumpSetMeta('클리어 저장 실패: '+jumpErr(e));jumpClearLock=false;}
+  }
+
+  async function jumpLoadRanks(){
+    const list=jumpSafeEl('jumpRankList'); if(!list)return;
+    list.innerHTML='<div class="empty">랭킹 불러오는 중...</div>';
+    try{
+      const rows=await sbFetch('/jump_players?select=name,score,unlocked_stage,last_stage,updated_at&order=score.desc,unlocked_stage.desc,updated_at.asc&limit=15');
+      if(!rows||!rows.length){list.innerHTML='<div class="empty">아직 기록이 없어.</div>';return;}
+      list.innerHTML=rows.map((r,i)=>`<div class="jump-rank-row"><b>${i+1}</b><div>${jumpHtml(r.name)}<br><span style="color:#6b7280;font-size:11px">STAGE ${Number(r.unlocked_stage)||1} · ${jumpDateText(r.updated_at)}</span></div><div class="jump-rank-score">${Number(r.score)||0}점</div></div>`).join('');
+    }catch(e){console.error(e);list.innerHTML=`<div class="empty">랭킹 불러오기 실패<br>${jumpHtml(jumpErr(e))}</div>`;}
+  }
+
+  function jumpDraw(){
+    if(!jumpCtx||!jumpCanvas)return;
+    const c=jumpCtx,w=jumpCanvas.width,h=jumpCanvas.height;
+    c.clearRect(0,0,w,h);
+    const g=c.createLinearGradient(0,0,0,h);g.addColorStop(0,['#bae6fd','#bbf7d0','#ddd6fe','#fed7aa'][jumpLevel?jumpLevel.bg:0]||'#bae6fd');g.addColorStop(1,'#f8fafc');c.fillStyle=g;c.fillRect(0,0,w,h);
+    c.save();c.translate(-jumpCameraX,0);
+    c.fillStyle='rgba(255,255,255,.45)';
+    for(let i=0;i<8;i++){const x=((i*170+40)-(jumpCameraX*.25%(170*8)));c.beginPath();c.roundRect(x,44+(i%3)*34,58,16,8);c.fill();}
+    if(jumpLevel){
+      jumpLevel.platforms.forEach(p=>drawPlatform(c,p));
+      jumpLevel.hazards.forEach(hz=>drawSpike(c,hz));
+      drawGoal(c,jumpLevel.goal);
+      drawPlayer(c,jumpPlayer);
+    }
+    c.restore();
+    if(!jumpStarted){drawOverlay(c,w,h,jumpPlayerRecord?'시작 버튼을 눌러줘':'이름을 입력하고 시작해줘');}
+    if(jumpPaused)drawOverlay(c,w,h,'일시정지');
+  }
+  function drawPlatform(c,p){
+    const colors={solid:'#64748b',ice:'#38bdf8',spring:'#22c55e',move:'#a855f7'};
+    c.fillStyle=colors[p.type]||colors.solid;c.strokeStyle='rgba(15,23,42,.35)';c.lineWidth=2;
+    c.beginPath();c.roundRect(p.x,p.y,p.w,p.h,6);c.fill();c.stroke();
+    c.fillStyle='rgba(255,255,255,.25)';c.fillRect(p.x+4,p.y+3,Math.max(0,p.w-8),3);
+    if(p.type==='spring'){c.fillStyle='#fef08a';c.fillRect(p.x+10,p.y-5,p.w-20,5)}
+  }
+  function drawSpike(c,s){
+    c.fillStyle='#ef4444';c.strokeStyle='#991b1b';c.lineWidth=1.5;c.beginPath();c.moveTo(s.x,s.y+s.h);c.lineTo(s.x+s.w/2,s.y);c.lineTo(s.x+s.w,s.y+s.h);c.closePath();c.fill();c.stroke();
+  }
+  function drawGoal(c,g){
+    c.strokeStyle='#475569';c.lineWidth=3;c.beginPath();c.moveTo(g.x,g.y+g.h);c.lineTo(g.x,g.y-22);c.stroke();
+    c.fillStyle='#ef4444';c.beginPath();c.moveTo(g.x+2,g.y-22);c.lineTo(g.x+30,g.y-13);c.lineTo(g.x+2,g.y-4);c.closePath();c.fill();
+    c.fillStyle='rgba(250,204,21,.25)';c.beginPath();c.arc(g.x+6,g.y+g.h-4,25,0,Math.PI*2);c.fill();
+  }
+  function drawPlayer(c,p){
+    c.fillStyle='#fff';c.strokeStyle='#111827';c.lineWidth=2;c.beginPath();c.roundRect(p.x,p.y,p.w,p.h,7);c.fill();c.stroke();
+    c.fillStyle='#111827';c.fillRect(p.x+7,p.y+10,3,4);c.fillRect(p.x+15,p.y+10,3,4);c.fillRect(p.x+9,p.y+20,8,2);
+  }
+  function drawOverlay(c,w,h,text){
+    c.save();c.fillStyle='rgba(17,24,39,.55)';c.fillRect(0,0,w,h);c.fillStyle='#fff';c.font='900 22px Pretendard, sans-serif';c.textAlign='center';c.fillText(text,w/2,h/2);c.restore();
+  }
+
+  const oldSetMainView=setMainView;
+  setMainView=function(view){
+    if(view==='jump'){
+      currentMainView='jump';
+      ['homeView','budgetListView','budgetView','tetrisView','dinoView','bambooView','guestbookView'].forEach(id=>{const el=jumpSafeEl(id);if(el)el.classList.remove('active')});
+      const j=jumpSafeEl('jumpView');if(j)j.classList.add('active');
+      const add=jumpSafeEl('addBtn');if(add)add.style.display='none';
+      ['showBudgetBtn','showTetrisBtn','showDinoBtn','showBambooBtn'].forEach(id=>{const el=jumpSafeEl(id);if(el)el.classList.remove('active')});
+      const jb=jumpSafeEl('showJumpBtn');if(jb)jb.classList.add('active');
+      closeDrawer();bindJump();jumpDraw();return;
+    }
+    oldSetMainView(view);
+    const j=jumpSafeEl('jumpView');if(j)j.classList.remove('active');
+    const jb=jumpSafeEl('showJumpBtn');if(jb)jb.classList.remove('active');
+  };
+
+  const oldUpdateGithubStatus=updateGithubStatus;
+  updateGithubStatus=function(){
+    oldUpdateGithubStatus();
+    if(githubStatus&&githubStatus.textContent&&!githubStatus.textContent.includes('jump_players')){
+      githubStatus.textContent=githubStatus.textContent.replace('game_scores / budget_sheets / app_meta / guestbook','game_scores / budget_sheets / app_meta / guestbook / jump_players / jump_stage_clears');
+    }
+  };
+  const oldTestGithubConnection=testGithubConnection;
+  testGithubConnection=async function(){
+    try{
+      await oldTestGithubConnection();
+      await sbFetch('/jump_players?select=id&limit=1');
+      await sbFetch('/jump_stage_clears?select=id&limit=1');
+      jumpShowToast('Supabase + 점프맵 테이블 연결 성공');
+    }catch(e){lastGithubError=jumpErr(e);lastSyncText=`점프맵 테이블 확인 실패 ${nowText()}`;updateGithubStatus();alert('점프맵 테이블 확인 실패: '+lastGithubError+'\n전달한 supabase_jumpmap.sql을 먼저 실행해줘.');}
+  };
+  if(jumpSafeEl('testGithubBtn'))jumpSafeEl('testGithubBtn').onclick=testGithubConnection;
+
+  installJumpDom();
+  bindClick('homeJumpCard',()=>setMainView('jump'));
+  bindClick('showJumpBtn',()=>setMainView('jump'));
+  setMainView(currentMainView||'home');
+})();
