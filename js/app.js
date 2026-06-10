@@ -2123,7 +2123,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
           <div class="jump-select-panel"><div class="jump-select-head"><div class="jump-select-title">스테이지 선택</div><button class="jump-small-btn" id="jumpContinueBtn" type="button">이어하기</button></div><div class="jump-stage-grid" id="jumpStageGrid"></div></div>
           <div class="jump-stage"><canvas id="jumpCanvas" width="460" height="300"></canvas></div>
           <div class="jump-controls"><button class="jump-control-btn" id="jumpLeftBtn" type="button">←</button><button class="jump-control-btn jump" id="jumpJumpBtn" type="button">점프</button><button class="jump-control-btn" id="jumpRightBtn" type="button">→</button></div>
-          <div class="jump-help">PC: ←/→ 이동, ↑/Space 점프, R 다시시작, P 일시정지<br>폰: 아래 버튼을 누르고 있으면 이동해.</div>
+          <div class="jump-help">PC: ←/→ 이동, ↑/Space 점프, R 다시시작, P 일시정지<br>폰: 아래 버튼을 누르고 있으면 이동해. 파란 타일은 얼음이라 미끄러워.</div>
           <div class="jump-select-panel"><div class="jump-select-head"><div class="jump-select-title">진행도 랭킹</div><button class="jump-small-btn" id="jumpRefreshRankBtn" type="button">새로고침</button></div><div class="jump-rank-list" id="jumpRankList"><div class="empty">랭킹 불러오기 전</div></div></div>
         </div>`;
       const anchor=jumpSafeEl('bambooView')||document.querySelector('.view-page:last-of-type');
@@ -2276,6 +2276,8 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     jumpLevel=jumpGenerateStage(jumpStageNo);
     jumpResetPlayer();
     jumpStarted=false;jumpPaused=false;jumpClearLock=false;jumpCameraX=0;jumpDeaths=0;
+    jumpSelectedAt=(performance&&performance.now)?performance.now():Date.now();
+    jumpStageStartedAt=0;
     jumpBuildStageGrid();jumpUpdateUi();jumpDraw();
     if(startNow)jumpStart();
   }
@@ -2283,7 +2285,8 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function jumpStart(){
     if(!jumpPlayerRecord){jumpLoadPlayerFromInput();return;}
     if(!jumpLevel)jumpSelectStage(jumpStageNo,false);
-    jumpStarted=true;jumpPaused=false;jumpClearLock=false;jumpStartTime=performance.now();jumpLastTime=performance.now();
+    const now=(performance&&performance.now)?performance.now():Date.now();
+    jumpStarted=true;jumpPaused=false;jumpClearLock=false;jumpStartTime=now;jumpLastTime=now;jumpStageStartedAt=now;
     jumpKeys.jump=false;jumpTouch.jump=false;
     cancelAnimationFrame(jumpLoopId);jumpLoopId=requestAnimationFrame(jumpLoop);
   }
@@ -2311,8 +2314,14 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     };
     const laneHazard=(hazards,p,side='right')=>{
       if(!p||p.w<64)return;
+      const y=p.y-18;
+      // 한 발판 안에 가시가 2개 이상 생기면 착지/통과 구간이 거의 사라져
+      // 29탄처럼 클리어 불가능하게 보이는 배치가 생긴다.
+      // 그래서 발판 하나에는 가시를 최대 1개만 허용한다.
+      const already=hazards.some(h=>h&&h.type==='spike'&&Math.abs(Number(h.y)-y)<1&&Number(h.x)>=p.x-2&&Number(h.x)+Number(h.w)<=p.x+p.w+2);
+      if(already)return;
       const x=side==='left'?p.x+5:p.x+p.w-23;
-      hazards.push({x:Math.round(x),y:p.y-18,w:19,h:18,type:'spike'});
+      hazards.push({x:Math.round(x),y,w:19,h:18,type:'spike'});
     };
 
     const manual={
@@ -2447,7 +2456,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     jumpMoveAxis('y',jumpPlayer.vy*dt);
     if(jumpPlayer.y>jumpLevel.height+120)jumpDie();
     for(const h of jumpLevel.hazards){if(rectHit(jumpPlayer,h)){jumpDie();return;}}
-    if(rectHit(jumpPlayer,jumpLevel.goal))jumpClearStage();
+    if(jumpCanClearStage())jumpClearStage();
     const target=Math.max(0,Math.min(jumpLevel.width-jumpCanvas.width,jumpPlayer.x-jumpCanvas.width*.38));
     jumpCameraX+=((target||0)-jumpCameraX)*Math.min(1,dt*6);
   }
@@ -2476,26 +2485,39 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(jumpPlayer.x+jumpPlayer.w>jumpLevel.width){jumpPlayer.x=jumpLevel.width-jumpPlayer.w;jumpPlayer.vx=0;}
   }
   function rectHit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;}
+  function jumpCanClearStage(){
+    if(!jumpStarted||jumpPaused||jumpClearLock||!jumpLevel||!jumpLevel.goal)return false;
+    const now=(performance&&performance.now)?performance.now():Date.now();
+    if(!jumpStageStartedAt||now-jumpStageStartedAt<450)return false;
+    const g=jumpLevel.goal;
+    if(!rectHit(jumpPlayer,g))return false;
+    const cx=jumpPlayer.x+jumpPlayer.w/2;
+    const bottom=jumpPlayer.y+jumpPlayer.h;
+    const insideGoalX=cx>=g.x+4&&cx<=g.x+g.w-4;
+    const atGoalBase=bottom>=g.y+g.h-2&&bottom<=g.y+g.h+18;
+    return jumpPlayer.onGround&&insideGoalX&&atGoalBase;
+  }
   function jumpDie(){jumpDeaths++;jumpResetPlayer();jumpCameraX=Math.max(0,jumpPlayer.x-80);jumpShowToast('다시 도전');}
   async function jumpClearStage(){
-    if(jumpClearLock||!jumpPlayerRecord)return;
+    if(jumpClearLock||!jumpPlayerRecord||!jumpCanClearStage())return;
+    const clearedStageNo=jumpStageNo;
     jumpClearLock=true;jumpStarted=false;cancelAnimationFrame(jumpLoopId);
-    const elapsed=Math.max(1,Math.round(performance.now()-jumpStartTime));
+    const elapsed=Math.max(1,Math.round(((performance&&performance.now)?performance.now():Date.now())-jumpStartTime));
     try{
-      const old=(jumpClears||[]).find(r=>Number(r.stage_no)===jumpStageNo);
+      const old=(jumpClears||[]).find(r=>Number(r.stage_no)===clearedStageNo);
       const best=old&&old.best_time_ms?Math.min(Number(old.best_time_ms),elapsed):elapsed;
       const deaths=(old?Number(old.deaths)||0:0)+jumpDeaths;
       const clearCount=(old?Number(old.clear_count)||0:0)+1;
-      await sbFetch('/jump_stage_clears?on_conflict=player_id,stage_no',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify([{player_id:jumpPlayerRecord.id,stage_no:jumpStageNo,best_time_ms:best,deaths,clear_count:clearCount,cleared_at:new Date().toISOString(),updated_at:new Date().toISOString()}])});
+      await sbFetch('/jump_stage_clears?on_conflict=player_id,stage_no',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify([{player_id:jumpPlayerRecord.id,stage_no:clearedStageNo,best_time_ms:best,deaths,clear_count:clearCount,cleared_at:new Date().toISOString(),updated_at:new Date().toISOString()}])});
       jumpClears=await jumpFetchClears(jumpPlayerRecord.id);
       const score=jumpGetScore();
-      const unlocked=Math.min(JUMP_TOTAL_STAGES,Math.max(jumpGetUnlocked(),jumpStageNo+1));
-      const lastStage=Math.min(JUMP_TOTAL_STAGES,jumpStageNo+1);
+      const unlocked=Math.min(JUMP_TOTAL_STAGES,Math.max(jumpGetUnlocked(),clearedStageNo+1));
+      const lastStage=Math.min(JUMP_TOTAL_STAGES,clearedStageNo+1);
       await sbFetch('/jump_players?on_conflict=name',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify([{id:jumpPlayerRecord.id,name:jumpPlayerRecord.name,score,unlocked_stage:unlocked,last_stage:lastStage,updated_at:new Date().toISOString()}])});
       const rows=await sbFetch(`/jump_players?select=id,name,unlocked_stage,score,last_stage,created_at,updated_at&id=eq.${encodeURIComponent(jumpPlayerRecord.id)}&limit=1`);
       if(rows&&rows[0])jumpPlayerRecord=rows[0];
       jumpUpdateUi();jumpBuildStageGrid();jumpLoadRanks();
-      jumpShowToast(`STAGE ${jumpStageNo} 클리어 · +1점`);
+      jumpShowToast(`STAGE ${clearedStageNo} 클리어 · +1점`);
       setTimeout(()=>{jumpSelectStage(lastStage,false);jumpDraw();},650);
     }catch(e){console.error(e);jumpShowToast('클리어 저장 실패','error');jumpSetMeta('클리어 저장 실패: '+jumpErr(e));jumpClearLock=false;}
   }
@@ -2811,4 +2833,84 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     }
   `;
   document.head.appendChild(st);
+})();
+
+/* Budget detail back button: return from selected personal ledger to budget list */
+(function installBudgetDetailBackButton(){
+  function byId(id){return document.getElementById(id)}
+  function ensureBudgetBackButton(){
+    const budgetView=byId('budgetView');
+    const menuBtn=byId('menuBtn');
+    if(!budgetView||!menuBtn)return;
+    let btn=byId('budgetBackToListBtn');
+    if(!btn){
+      btn=document.createElement('button');
+      btn.id='budgetBackToListBtn';
+      btn.type='button';
+      btn.className='budget-back-btn';
+      btn.innerHTML='← 목록';
+      btn.title='지출표 목록으로 돌아가기';
+      btn.onclick=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(typeof setMainView==='function')setMainView('budgetList');
+      };
+      if(menuBtn.parentNode)menuBtn.parentNode.insertBefore(btn,menuBtn.nextSibling);
+      else budgetView.insertBefore(btn,budgetView.firstChild);
+    }
+    const isBudgetActive=budgetView.classList.contains('active') || (typeof currentMainView!=='undefined'&&currentMainView==='budget');
+    btn.style.display=isBudgetActive?'inline-flex':'none';
+  }
+  if(!byId('budgetBackToListStyle')){
+    const st=document.createElement('style');
+    st.id='budgetBackToListStyle';
+    st.textContent=`
+      #budgetBackToListBtn.budget-back-btn{
+        align-items:center;
+        justify-content:center;
+        min-width:58px;
+        height:34px;
+        margin-left:8px;
+        padding:0 11px;
+        border:1px solid rgba(15,23,42,.12);
+        border-radius:999px;
+        background:#fff;
+        color:#111827;
+        font-size:13px;
+        font-weight:900;
+        letter-spacing:-.03em;
+        box-shadow:0 8px 18px rgba(15,23,42,.08);
+        cursor:pointer;
+        -webkit-tap-highlight-color:transparent;
+      }
+      #budgetBackToListBtn.budget-back-btn:active{transform:translateY(1px);}
+      @media(max-width:420px){
+        #budgetBackToListBtn.budget-back-btn{min-width:52px;height:32px;margin-left:6px;padding:0 9px;font-size:12px;}
+      }
+    `;
+    document.head.appendChild(st);
+  }
+  const prevSetMainView=typeof setMainView==='function'?setMainView:null;
+  if(prevSetMainView&&!prevSetMainView.__budgetBackPatched){
+    const patched=function(view){
+      const result=prevSetMainView.apply(this,arguments);
+      setTimeout(ensureBudgetBackButton,0);
+      return result;
+    };
+    patched.__budgetBackPatched=true;
+    setMainView=patched;
+  }
+  const prevRender=typeof render==='function'?render:null;
+  if(prevRender&&!prevRender.__budgetBackPatched){
+    const patchedRender=function(){
+      const result=prevRender.apply(this,arguments);
+      ensureBudgetBackButton();
+      return result;
+    };
+    patchedRender.__budgetBackPatched=true;
+    render=patchedRender;
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ensureBudgetBackButton,{once:true});
+  else ensureBudgetBackButton();
+  setTimeout(ensureBudgetBackButton,200);
 })();
