@@ -61,6 +61,14 @@ function money(v){return Number(v||0).toLocaleString("ko-KR")+"원"}
 function dayText(d){if(isFullDateString(d))return String(d).replace(/-/g,".");const n=Number(d);return n?`${n}일`:"일자없음"}
 function esc(t){return String(t).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 function escapeHtml(t){return esc(t)}
+function isTypingTarget(target){
+ const el=target||document.activeElement;
+ if(!el)return false;
+ const tag=(el.tagName||"").toLowerCase();
+ if(tag==="input"||tag==="textarea"||tag==="select"||tag==="button")return true;
+ if(el.isContentEditable)return true;
+ return !!(el.closest&&el.closest("input,textarea,select,button,[contenteditable=\'true\'],[contenteditable=\'\']"));
+}
 function nowText(){const d=new Date();return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}:${String(d.getSeconds()).padStart(2,"0")}`}
 
 
@@ -284,6 +292,7 @@ function initTetrisIfNeeded(){
 
 function handleTetrisKey(e){
  if(currentMainView!=="tetris")return;
+ if(isTypingTarget(e.target))return;
  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," ","p","P"].includes(e.key))e.preventDefault();
  const startKeys=["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," "];
  if(!tetrisRunning && startKeys.includes(e.key)){
@@ -996,6 +1005,7 @@ function initDinoIfNeeded(){
 }
 function handleDinoKeyDown(e){
  if(currentMainView!=="dino")return;
+ if(isTypingTarget(e.target))return;
  if(["ArrowUp","ArrowDown"," ","p","P"].includes(e.key))e.preventDefault();
  const startKeys=["ArrowUp","ArrowDown"," "];
  if(!dinoRunning && startKeys.includes(e.key)){
@@ -1007,6 +1017,7 @@ function handleDinoKeyDown(e){
 }
 function handleDinoKeyUp(e){
  if(currentMainView!=="dino")return;
+ if(isTypingTarget(e.target))return;
  if(e.key==="ArrowDown")setDinoDuck(false);
 }
 function resetDino(){
@@ -1389,6 +1400,7 @@ function bindBambooTouchButton(id,key){
 
 function handleBambooKeyDown(e){
  if(currentMainView!=="bamboo")return;
+ if(isTypingTarget(e.target))return;
  const k=e.key.toLowerCase();
  if(["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d","p"].includes(k))e.preventDefault();
  const startKeys=["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d"];
@@ -1404,6 +1416,7 @@ function handleBambooKeyDown(e){
 
 function handleBambooKeyUp(e){
  if(currentMainView!=="bamboo")return;
+ if(isTypingTarget(e.target))return;
  const k=e.key.toLowerCase();
  if(k==="arrowup"||k==="w")bambooKeys.up=false;
  else if(k==="arrowdown"||k==="s")bambooKeys.down=false;
@@ -2324,6 +2337,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function jumpIsStartKey(e){return e&&((e.key==='ArrowUp')||(e.key===' ')||(e.key==='Spacebar')||(e.code==='Space')||(e.key==='Space'));}
   function jumpKeyDown(e){
     if(currentMainView!=='jump')return;
+    if(isTypingTarget(e.target))return;
     const isStartKey=jumpIsStartKey(e);
     if(['ArrowLeft','ArrowRight','ArrowUp',' ','Spacebar','Space','r','R','p','P'].includes(e.key)||e.code==='Space')e.preventDefault();
     if(e.key==='ArrowLeft')jumpKeys.left=true;
@@ -2336,6 +2350,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(e.key==='p'||e.key==='P')jumpTogglePause();
   }
   function jumpKeyUp(e){
+    if(isTypingTarget(e.target))return;
     if(e.key==='ArrowLeft')jumpKeys.left=false;
     if(e.key==='ArrowRight')jumpKeys.right=false;
     if(jumpIsStartKey(e))jumpKeys.jump=false;
