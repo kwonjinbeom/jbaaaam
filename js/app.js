@@ -2921,18 +2921,26 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   omokInstallDom(); const hc=omokSafe('homeOmokCard'); if(hc)hc.onclick=()=>setMainView('omok'); const mb=omokSafe('showOmokBtn'); if(mb)mb.onclick=()=>setMainView('omok'); setMainView(currentMainView||'home');
 })();
 
-/* Drawer menu scroll fix: keep newly added menu items reachable on small screens */
+/* Drawer menu scroll fix: scroll the whole side menu, not each small section */
 (function installDrawerMenuScrollFix(){
-  if(document.getElementById('drawerMenuScrollFixStyle'))return;
+  const old=document.getElementById('drawerMenuScrollFixStyle');
+  if(old)old.remove();
   const st=document.createElement('style');
   st.id='drawerMenuScrollFixStyle';
   st.textContent=`
-    #drawerBackdrop.open{overflow:hidden!important;}
-    #drawerBackdrop > *{
-      max-height:calc(100dvh - 20px)!important;
+    #drawerBackdrop.open{
       overflow-y:auto!important;
+      overflow-x:hidden!important;
       -webkit-overflow-scrolling:touch!important;
       overscroll-behavior:contain!important;
+      align-items:flex-start!important;
+      padding-top:10px!important;
+      padding-bottom:10px!important;
+    }
+    #drawerBackdrop > *{
+      max-height:none!important;
+      overflow:visible!important;
+      flex-shrink:0!important;
     }
     #drawerBackdrop .drawer,
     #drawerBackdrop .drawer-panel,
@@ -2940,11 +2948,15 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     #drawerBackdrop .side-drawer,
     #drawerBackdrop .sheet-drawer,
     #drawerBackdrop .menu-drawer,
-    #drawerBackdrop [class*="drawer"]{
-      max-height:calc(100dvh - 20px)!important;
-      overflow-y:auto!important;
-      -webkit-overflow-scrolling:touch!important;
-      overscroll-behavior:contain!important;
+    #drawerBackdrop [class*="drawer"],
+    #drawerBackdrop .sheet-list,
+    #drawerBackdrop #sheetList,
+    #drawerBackdrop .menu-section,
+    #drawerBackdrop .menu-section-btn{
+      max-height:none!important;
+      overflow:visible!important;
+      -webkit-overflow-scrolling:auto!important;
+      overscroll-behavior:auto!important;
     }
     #drawerBackdrop .sheet-list,
     #drawerBackdrop #sheetList,
@@ -2952,17 +2964,8 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     #drawerBackdrop .menu-section-btn{
       flex-shrink:0!important;
     }
-    @supports(height:100svh){
-      #drawerBackdrop > *,
-      #drawerBackdrop .drawer,
-      #drawerBackdrop .drawer-panel,
-      #drawerBackdrop .drawer-content,
-      #drawerBackdrop .side-drawer,
-      #drawerBackdrop .sheet-drawer,
-      #drawerBackdrop .menu-drawer,
-      #drawerBackdrop [class*="drawer"]{
-        max-height:calc(100svh - 20px)!important;
-      }
+    @supports(height:100dvh){
+      #drawerBackdrop.open{max-height:100dvh!important;}
     }
   `;
   document.head.appendChild(st);
