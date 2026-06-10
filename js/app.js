@@ -3411,3 +3411,145 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   setMainView=function(view){ if(view==='brick'){showBrickView();return;} const r=oldSetMainView(view); const bv=$b('brickView'); if(bv)bv.classList.remove('active'); return r; };
   setTimeout(ensureBrickUi,0);
 })();
+
+/* === Idle Life RPG Addon: 백수 키우기 === */
+(function(){
+  const IDLE_NAME_KEY='jbaaaam_idle_player_name_v1';
+  const IDLE_TAB_KEY='jbaaaam_idle_tab_v1';
+  const $i=id=>document.getElementById(id);
+  const html=v=>String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+  const n=v=>Number(v||0);
+  const won=v=>Math.floor(n(v)).toLocaleString('ko-KR')+'원';
+  const compact=v=>{v=n(v); if(v>=1e12)return (v/1e12).toFixed(2)+'조'; if(v>=1e8)return (v/1e8).toFixed(2)+'억'; if(v>=1e4)return (v/1e4).toFixed(1)+'만'; return Math.floor(v).toLocaleString('ko-KR');};
+  const nowIso=()=>new Date().toISOString();
+  let idleReady=false,idlePlayer=null,idleUpgrades={},idleStats=null,idleTickTimer=null,idleRenderTimer=null,idleSaveTimer=null,idleEventTimer=null,idleCasinoBusy=false,idleLastRender=0;
+  const IDLE_TABS=[['click','클릭'],['job','알바'],['side','부업'],['auto','자동화'],['invest','투자'],['life','생활'],['casino','카지노']];
+  const IDLE_UPGRADES=[
+    {key:'finger',cat:'click',name:'손가락 단련',max:80,base:120,growth:1.16,click:7,desc:'클릭 수익 증가'},
+    {key:'coffee',cat:'click',name:'커피 한잔',max:50,base:450,growth:1.18,click:18,desc:'잠이 확 깨서 클릭 수익 증가'},
+    {key:'focus',cat:'click',name:'집중력 폭발',max:45,base:1200,growth:1.20,clickMult:.018,desc:'클릭 전체 배율 증가'},
+    {key:'typing',cat:'click',name:'타자 속도',max:60,base:900,growth:1.17,click:26,desc:'일하기 버튼 효율 증가'},
+    {key:'critical',cat:'click',name:'크리티컬 클릭',max:30,base:2500,growth:1.23,crit:.012,desc:'가끔 클릭 수익이 크게 터짐'},
+    {key:'conveni',cat:'job',name:'편의점 야간알바',max:70,base:300,growth:1.16,income:4,desc:'초반 자동수익'},
+    {key:'delivery',cat:'job',name:'배달 알바',max:70,base:900,growth:1.17,income:12,desc:'꾸준한 자동수익'},
+    {key:'warehouse',cat:'job',name:'물류센터',max:60,base:1800,growth:1.18,income:24,desc:'힘들지만 수익 좋음'},
+    {key:'cafe',cat:'job',name:'카페 알바',max:55,base:2600,growth:1.19,income:34,desc:'멘탈 관리형 수익'},
+    {key:'event_staff',cat:'job',name:'행사 스태프',max:45,base:5200,growth:1.21,income:75,desc:'단기 고수익 알바'},
+    {key:'used_market',cat:'side',name:'중고거래',max:70,base:1200,growth:1.17,income:18,desc:'안 쓰는 물건 팔기'},
+    {key:'blog',cat:'side',name:'블로그 광고',max:60,base:4500,growth:1.19,income:70,desc:'잠자는 동안 광고수익'},
+    {key:'shorts',cat:'side',name:'쇼츠 수익',max:55,base:8000,growth:1.20,income:125,desc:'터지면 은근 큼'},
+    {key:'design_gig',cat:'side',name:'디자인 외주',max:45,base:16000,growth:1.22,income:270,desc:'부업 수익 증가'},
+    {key:'coding_gig',cat:'side',name:'코딩 외주',max:45,base:24000,growth:1.22,income:410,desc:'돈 되는 부업'},
+    {key:'macro',cat:'auto',name:'매크로 만들기',max:55,base:12000,growth:1.20,income:180,desc:'반복작업 자동화'},
+    {key:'excel_auto',cat:'auto',name:'엑셀 자동화',max:50,base:26000,growth:1.21,income:430,desc:'사무 자동화 수익'},
+    {key:'ai_doc',cat:'auto',name:'AI 문서작성',max:45,base:52000,growth:1.22,income:920,desc:'AI로 부업 자동화'},
+    {key:'ai_code',cat:'auto',name:'AI 코딩보조',max:40,base:90000,growth:1.23,income:1700,desc:'외주 처리속도 증가'},
+    {key:'agency_bot',cat:'auto',name:'외주 수주봇',max:35,base:180000,growth:1.24,income:3600,desc:'일감이 자동으로 굴러옴'},
+    {key:'saving',cat:'invest',name:'적금 풍차돌리기',max:60,base:10000,growth:1.19,income:110,incomeMult:.004,desc:'안전한 복리'},
+    {key:'dividend',cat:'invest',name:'배당주 모으기',max:55,base:35000,growth:1.21,income:520,incomeMult:.006,desc:'초당수익 배율 증가'},
+    {key:'etf',cat:'invest',name:'ETF 장기투자',max:50,base:90000,growth:1.22,income:1350,incomeMult:.008,desc:'방치수익 배율 증가'},
+    {key:'estate_piece',cat:'invest',name:'부동산 조각투자',max:42,base:260000,growth:1.24,income:4300,incomeMult:.010,desc:'후반 투자 수익'},
+    {key:'building',cat:'invest',name:'건물 매입',max:30,base:1100000,growth:1.27,income:22000,incomeMult:.014,desc:'건물주 루트'},
+    {key:'chair',cat:'life',name:'좋은 의자',max:30,base:6000,growth:1.20,clickMult:.012,incomeMult:.003,desc:'허리가 살아나서 전체 효율 증가'},
+    {key:'monitor',cat:'life',name:'듀얼모니터',max:30,base:16000,growth:1.21,clickMult:.016,incomeMult:.004,desc:'작업효율 증가'},
+    {key:'pc',cat:'life',name:'고성능 PC',max:28,base:42000,growth:1.23,clickMult:.020,incomeMult:.006,desc:'클릭/자동화 효율 증가'},
+    {key:'sleep',cat:'life',name:'수면 패턴 개선',max:25,base:85000,growth:1.24,offline:.18,incomeMult:.006,desc:'오프라인 보상 시간 증가'},
+    {key:'mental',cat:'life',name:'멘탈 관리',max:25,base:120000,growth:1.25,eventLuck:.010,incomeMult:.008,desc:'나쁜 이벤트 완화, 좋은 이벤트 증가'},
+    {key:'casino_study',cat:'casino',name:'확률 공부',max:25,base:22000,growth:1.23,casinoEdge:.006,desc:'카지노 기대값 손실을 조금 줄임'},
+    {key:'risk_control',cat:'casino',name:'손절 연습',max:25,base:55000,growth:1.24,casinoEdge:.005,eventLuck:.004,desc:'위험한 도박 손실 완화'},
+    {key:'lucky_charm',cat:'casino',name:'행운의 부적',max:20,base:110000,growth:1.25,eventLuck:.014,casinoEdge:.006,desc:'이벤트/카지노 운 보정'}
+  ];
+  const UPG=Object.fromEntries(IDLE_UPGRADES.map(u=>[u.key,u]));
+  function idleLevel(key){return Math.max(0,Number(idleUpgrades[key]||0));}
+  function idleCost(u,lv=idleLevel(u.key)){ return Math.ceil(u.base*Math.pow(u.growth,lv)*Math.pow(1.035,Math.floor(lv/10)*lv)); }
+  function idleTitle(life){ life=n(life); if(life>=1e13)return '우주 자본가'; if(life>=1e11)return '재벌'; if(life>=1e9)return '건물주'; if(life>=1e8)return '투자자'; if(life>=2e7)return '스타트업 대표'; if(life>=5e6)return '팀장'; if(life>=1e6)return '시니어 개발자'; if(life>=2e5)return '주니어 개발자'; if(life>=5e4)return '프리랜서'; if(life>=8000)return '알바생'; return '이불 밖은 위험해'; }
+  function deriveIdleStats(){
+    let click=10,income=0,clickMult=1,incomeMult=1,crit=0,offlineHours=2,eventLuck=0,casinoEdge=0,totalLv=0;
+    for(const u of IDLE_UPGRADES){ const lv=idleLevel(u.key); totalLv+=lv; if(!lv)continue; click+=n(u.click)*lv; income+=n(u.income)*lv*(1+Math.floor(lv/10)*0.12); clickMult+=n(u.clickMult)*lv; incomeMult+=n(u.incomeMult)*lv; crit+=n(u.crit)*lv; offlineHours+=n(u.offline)*lv; eventLuck+=n(u.eventLuck)*lv; casinoEdge+=n(u.casinoEdge)*lv; }
+    const prestige=Number(idlePlayer&&idlePlayer.prestige_level)||0; const prestigeMult=1+prestige*.08;
+    let activeMult=1; const ev=idlePlayer&&idlePlayer.active_event_key; const until=idlePlayer&&idlePlayer.active_event_until?new Date(idlePlayer.active_event_until).getTime():0;
+    if(until>Date.now()){ if(ev==='awakening')activeMult*=2; if(ev==='burnout')activeMult*=0.7; if(ev==='lucky_day')activeMult*=1.45; }
+    click=Math.max(1,click*clickMult*prestigeMult*activeMult); income=Math.max(0,income*incomeMult*prestigeMult*activeMult);
+    return {click,income,crit:Math.min(.35,crit),offlineHours:Math.min(12,offlineHours),eventLuck:Math.min(.22,eventLuck),casinoEdge:Math.min(.18,casinoEdge),totalLv,activeMult};
+  }
+  function idleDefaultPlayer(name){ return {name,money:0,lifetime_money:0,total_clicks:0,prestige_level:0,title:'이불 밖은 위험해',click_power:10,income_per_sec:0,active_event_key:null,active_event_until:null,last_seen_at:nowIso(),updated_at:nowIso()}; }
+  async function idleLoadByName(){
+    const input=$i('idleNameInput'); const name=String((input&&input.value)||localStorage.getItem(IDLE_NAME_KEY)||'').trim(); if(!name){idleToast('이름을 입력해줘','error'); input&&input.focus(); return;}
+    localStorage.setItem(IDLE_NAME_KEY,name);
+    try{
+      let rows=await sbFetch(`/idle_players?select=*&name=eq.${encodeURIComponent(name)}&limit=1`);
+      if(!rows||!rows.length){ rows=await sbFetch('/idle_players',{method:'POST',headers:{Prefer:'return=representation'},body:JSON.stringify([idleDefaultPlayer(name)])}); }
+      idlePlayer=rows[0]; await idleLoadUpgrades(); await idleApplyOfflineReward(); idleStartTimers(); idleRenderAll(); idleToast(`${name} 불러옴`);
+    }catch(e){ console.error(e); idleToast('불러오기 실패: '+idleErr(e),'error'); }
+  }
+  async function idleLoadUpgrades(){ if(!idlePlayer)return; const rows=await sbFetch(`/idle_upgrades?select=upgrade_key,level&player_id=eq.${encodeURIComponent(idlePlayer.id)}&limit=1000`); idleUpgrades={}; (rows||[]).forEach(r=>idleUpgrades[r.upgrade_key]=Number(r.level)||0); idleStats=deriveIdleStats(); }
+  async function idleSavePlayer(patch={}){ if(!idlePlayer)return; idleStats=deriveIdleStats(); const body={...patch,title:idleTitle(n(patch.lifetime_money??idlePlayer.lifetime_money)),click_power:idleStats.click,income_per_sec:idleStats.income,last_seen_at:nowIso(),updated_at:nowIso()}; const rows=await sbFetch(`/idle_players?id=eq.${encodeURIComponent(idlePlayer.id)}`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify(body)}); if(rows&&rows[0])idlePlayer=rows[0]; return idlePlayer; }
+  async function idleSaveUpgrade(key,level){ await sbFetch('/idle_upgrades?on_conflict=player_id,upgrade_key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify([{player_id:idlePlayer.id,upgrade_key:key,level,updated_at:nowIso()}])}); }
+  async function idleApplyOfflineReward(){ if(!idlePlayer)return; idleStats=deriveIdleStats(); const last=idlePlayer.last_seen_at?new Date(idlePlayer.last_seen_at).getTime():Date.now(); const sec=Math.max(0,(Date.now()-last)/1000); const cap=idleStats.offlineHours*3600; const paidSec=Math.min(sec,cap); const reward=Math.floor(idleStats.income*paidSec); if(reward>0){ await idleSavePlayer({money:n(idlePlayer.money)+reward,lifetime_money:n(idlePlayer.lifetime_money)+reward}); idleLogEvent('offline','오프라인 보상',`${Math.floor(paidSec/60)}분치 수익`,reward); idleToast(`오프라인 보상 ${won(reward)}`); } else { await idleSavePlayer({}); } }
+  function idleStartTimers(){
+    idleStopTimers(); let last=Date.now(); idleTickTimer=setInterval(()=>{ if(!idlePlayer)return; const t=Date.now(); const dt=Math.min(3,(t-last)/1000); last=t; idleStats=deriveIdleStats(); const gain=idleStats.income*dt; if(gain>0){ idlePlayer.money=n(idlePlayer.money)+gain; idlePlayer.lifetime_money=n(idlePlayer.lifetime_money)+gain; } if(Date.now()-idleLastRender>500){idleRenderAll(); idleLastRender=Date.now();} },500);
+    idleSaveTimer=setInterval(()=>idleFlushSave(),9000);
+    idleEventTimer=setInterval(()=>idleMaybeRandomEvent(),45000);
+  }
+  function idleStopTimers(){ [idleTickTimer,idleRenderTimer,idleSaveTimer,idleEventTimer].forEach(t=>t&&clearInterval(t)); idleTickTimer=idleRenderTimer=idleSaveTimer=idleEventTimer=null; }
+  async function idleFlushSave(){ if(!idlePlayer)return; try{ await idleSavePlayer({money:n(idlePlayer.money),lifetime_money:n(idlePlayer.lifetime_money),total_clicks:n(idlePlayer.total_clicks)}); idleLoadPublic(); }catch(e){console.warn(e);} }
+  async function idleWorkClick(){ if(!idlePlayer){idleToast('이름을 먼저 불러와줘','error');return;} idleStats=deriveIdleStats(); let gain=idleStats.click; if(Math.random()<idleStats.crit){gain*=5; idleToast('크리티컬 클릭 x5!');} idlePlayer.money=n(idlePlayer.money)+gain; idlePlayer.lifetime_money=n(idlePlayer.lifetime_money)+gain; idlePlayer.total_clicks=n(idlePlayer.total_clicks)+1; idleRenderAll(); if(n(idlePlayer.total_clicks)%20===0)idleFlushSave(); }
+  async function idleBuyUpgrade(key){ if(!idlePlayer){idleToast('이름을 먼저 불러와줘','error');return;} const u=UPG[key]; if(!u)return; const lv=idleLevel(key); if(lv>=u.max){idleToast('이미 최대 레벨이야');return;} const cost=idleCost(u,lv); if(n(idlePlayer.money)<cost){idleToast(`돈 부족: ${won(cost)}`,'error');return;} idlePlayer.money=n(idlePlayer.money)-cost; idleUpgrades[key]=lv+1; idleStats=deriveIdleStats(); await idleSaveUpgrade(key,lv+1); await idleSavePlayer({money:n(idlePlayer.money),lifetime_money:n(idlePlayer.lifetime_money)}); idleRenderAll(); idleToast(`${u.name} Lv.${lv+1}`); }
+  function idleMaybeRandomEvent(){ if(!idlePlayer||Math.random()>.38)return; const luck=idleStats?idleStats.eventLuck:0; const events=[
+    {key:'awakening',label:'각성',text:'60초간 모든 수익 2배',dur:60,good:true},
+    {key:'lucky_day',label:'운수 좋은 날',text:'90초간 수익 +45%',dur:90,good:true},
+    {key:'bonus',label:'월급날 착각',text:'2분치 수익 즉시 획득',money:()=>Math.max(500,(idleStats&&idleStats.income||0)*120),good:true},
+    {key:'chicken',label:'치킨 유혹',text:'치킨값 지출',money:()=>-Math.min(n(idlePlayer.money)*.05,Math.max(20000,n(idlePlayer.money)*.12)),bad:true},
+    {key:'burnout',label:'번아웃',text:'60초간 수익 -30%',dur:60,bad:true},
+    {key:'server_down',label:'서버 터짐',text:'1분치 수익 증발',money:()=>-Math.min(n(idlePlayer.money)*.08,(idleStats&&idleStats.income||0)*60),bad:true}
+  ];
+    const pool=events.filter(e=>e.good||Math.random()>(.45+luck)); const ev=pool[Math.floor(Math.random()*pool.length)]||events[0]; idleApplyEvent(ev);
+  }
+  async function idleApplyEvent(ev){ if(!idlePlayer)return; let amount=0,patch={}; if(ev.money){amount=Math.floor(ev.money()); idlePlayer.money=Math.max(0,n(idlePlayer.money)+amount); if(amount>0)idlePlayer.lifetime_money=n(idlePlayer.lifetime_money)+amount; patch.money=n(idlePlayer.money); patch.lifetime_money=n(idlePlayer.lifetime_money); } if(ev.dur){ patch.active_event_key=ev.key; patch.active_event_until=new Date(Date.now()+ev.dur*1000).toISOString(); idlePlayer.active_event_key=patch.active_event_key; idlePlayer.active_event_until=patch.active_event_until; } idleLogEvent(ev.key,ev.label,ev.text,amount); await idleSavePlayer(patch); idleRenderAll(); idleToast(`${ev.label}: ${ev.text}`+(amount?` (${amount>0?'+':''}${won(amount)})`:''),ev.bad?'error':'ok'); }
+  async function idleLogEvent(key,label,text,amount=0){ if(!idlePlayer)return; try{ await sbFetch('/idle_event_logs',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify([{player_id:idlePlayer.id,event_key:key,event_label:label,effect_text:text,amount:Math.floor(amount)}])}); }catch(e){} }
+  async function idleCasino(type){
+    if(!idlePlayer||idleCasinoBusy)return; idleCasinoBusy=true; try{ idleStats=deriveIdleStats(); const money=n(idlePlayer.money); if(money<100){idleToast('카지노는 최소 100원부터','error');return;} const edge=idleStats.casinoEdge||0; let bet=0,result=0,label='',text='';
+      if(type==='coin'){ bet=Math.max(100,Math.min(money*.03,5000000)); const win=Math.random()<(0.47+edge); result=win?bet*1.95:-bet; label='동전 뒤집기'; text=win?'앞면 적중':'뒷면 꽝'; }
+      if(type==='lotto'){ bet=Math.max(500,Math.min(money*.06,20000000)); const win=Math.random()<(0.145+edge*.45); result=win?bet*6.2:-bet; label='알바 로또'; text=win?'대박 당첨':'낙첨'; }
+      if(type==='cointrade'){ bet=Math.max(1000,Math.min(money*.10,80000000)); const r=Math.random(); let mult=r<.08?2.8:r<.28?1.45:r<.62?.92:.45; mult+=edge*.9; result=bet*(mult-1); label='코인 단타'; text=`${mult.toFixed(2)}배`; }
+      result=Math.floor(result); idlePlayer.money=Math.max(0,money+result); if(result>0)idlePlayer.lifetime_money=n(idlePlayer.lifetime_money)+result; await idleSavePlayer({money:n(idlePlayer.money),lifetime_money:n(idlePlayer.lifetime_money)}); await idleLogEvent('casino_'+type,label,text,result); idleRenderAll(); idleToast(`${label} ${text} · ${result>=0?'+':''}${won(result)}`,result<0?'error':'ok'); }
+    finally{ setTimeout(()=>idleCasinoBusy=false,650); }
+  }
+  async function idleLoadPublic(){ const box=$i('idlePublicBox'); if(!box)return; try{ const [rank,recent]=await Promise.all([sbFetch('/idle_player_rankings?select=*&order=lifetime_money.desc&limit=20'),sbFetch('/idle_recent_events?select=*&order=created_at.desc&limit=16')]); const me=idlePlayer&&idlePlayer.name; box.innerHTML=`<div class="idle-panel"><h3>전체 자산 랭킹</h3>${(rank||[]).length?(rank||[]).map((r,i)=>`<div class="idle-rank ${me===r.name?'me':''}"><b>${i+1}</b><span>${html(r.name)}<small>${html(r.title||'')}</small></span><strong>${compact(r.lifetime_money)}원</strong></div>`).join(''):'<p class="idle-muted">아직 랭킹 없음</p>'}</div><div class="idle-panel"><h3>최근 성장/도박 이력</h3>${(recent||[]).length?(recent||[]).map(r=>`<div class="idle-log"><span>${html(r.name||'-')} · ${html(r.event_label||'이벤트')}<small>${html(r.effect_text||'')}</small></span><strong class="${n(r.amount)<0?'bad':'good'}">${n(r.amount)?(n(r.amount)>0?'+':'')+compact(r.amount)+'원':''}</strong></div>`).join(''):'<p class="idle-muted">최근 이력 없음</p>'}</div>`; }catch(e){ box.innerHTML='<p class="idle-muted">랭킹/이력을 불러오지 못했어. SQL 실행 여부를 확인해줘.</p>'; } }
+  function idleRenderAll(){ idleStats=deriveIdleStats(); if(!$i('idlePlayerName'))return; const p=idlePlayer; $i('idlePlayerName').textContent=p?p.name:'-'; $i('idleTitleText').textContent=p?idleTitle(p.lifetime_money):'-'; $i('idleMoneyText').textContent=p?won(p.money):'0원'; $i('idleLifeText').textContent=p?won(p.lifetime_money):'0원'; $i('idleCpsText').textContent=p?won(idleStats.income)+'/s':'0원/s'; $i('idleClickText').textContent=p?won(idleStats.click):'0원'; $i('idleOfflineText').textContent=p?`최대 ${idleStats.offlineHours.toFixed(1)}시간`:'-'; const ev=$i('idleEventText'); if(ev){ const until=p&&p.active_event_until?new Date(p.active_event_until).getTime():0; ev.textContent=until>Date.now()?`${eventName(p.active_event_key)} ${Math.ceil((until-Date.now())/1000)}초`:'이벤트 없음'; }
+    renderIdleUpgrades(); }
+  function eventName(k){return {awakening:'각성',burnout:'번아웃',lucky_day:'운수 좋은 날'}[k]||'이벤트';}
+  function renderIdleUpgrades(){ const list=$i('idleUpgradeList'); if(!list)return; const tab=localStorage.getItem(IDLE_TAB_KEY)||'click'; if(tab==='casino'){ list.innerHTML=`<div class="idle-casino-grid"><button type="button" data-casino="coin"><b>동전 뒤집기</b><small>소액 · 거의 반반 · 평균은 살짝 손해</small></button><button type="button" data-casino="lotto"><b>알바 로또</b><small>낮은 확률 · 큰 보상 · 위험함</small></button><button type="button" data-casino="cointrade"><b>코인 단타</b><small>변동성 큼 · 손절 연습 중요</small></button></div><p class="idle-muted">도박은 성장 보조용이야. 확률 공부/손절/부적을 올리면 손실 기대값이 조금 줄어들지만, 안정 성장은 업그레이드가 더 좋아.</p>`; list.querySelectorAll('[data-casino]').forEach(b=>b.onclick=()=>idleCasino(b.dataset.casino)); return; }
+    const arr=IDLE_UPGRADES.filter(u=>u.cat===tab); list.innerHTML=arr.map(u=>{ const lv=idleLevel(u.key),cost=idleCost(u,lv),max=lv>=u.max,can=idlePlayer&&!max&&n(idlePlayer.money)>=cost; return `<div class="idle-upgrade ${can?'can':''}"><div><b>${html(u.name)} <em>Lv.${lv}/${u.max}</em></b><small>${html(u.desc)}</small><small>다음 비용 ${max?'MAX':won(cost)}</small></div><button type="button" data-up="${u.key}" ${!can?'disabled':''}>${max?'MAX':'구매'}</button></div>`; }).join(''); list.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>idleBuyUpgrade(b.dataset.up)); }
+  function setIdleTab(tab){ localStorage.setItem(IDLE_TAB_KEY,tab); document.querySelectorAll('.idle-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); renderIdleUpgrades(); }
+  function currentName(){return localStorage.getItem(IDLE_NAME_KEY)||localStorage.getItem('simple_budget_last_game_name')||'';}
+  function idleErr(e){return e&&e.message?e.message:String(e||'알 수 없는 오류');}
+  function idleToast(msg,type='ok'){ if(typeof showToast==='function')showToast(msg,type==='error'?'error':''); else console.log(msg); }
+  function injectIdleStyle(){ if($i('idleStyle'))return; const st=document.createElement('style'); st.id='idleStyle'; st.textContent=`
+    .idle-card .app-icon{background:linear-gradient(135deg,#fef3c7,#fb923c)!important}.idle-page{display:none}.idle-page.active{display:block}.idle-shell{display:grid;gap:12px}.idle-login{display:flex;gap:8px;align-items:center}.idle-login input{flex:1}.idle-status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.idle-status-grid>div{background:rgba(15,23,42,.06);border:1px solid rgba(15,23,42,.08);border-radius:14px;padding:10px}.idle-status-grid span{display:block;font-size:12px;color:#64748b}.idle-status-grid strong{font-size:17px}.idle-work-btn{width:100%;border:0;border-radius:22px;padding:20px;font-weight:1000;font-size:22px;background:linear-gradient(135deg,#fde68a,#fb923c);color:#111827;box-shadow:0 10px 22px rgba(251,146,60,.25)}.idle-tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}.idle-tab{white-space:nowrap;border:1px solid rgba(15,23,42,.1);background:#fff;border-radius:999px;padding:8px 11px;font-weight:900}.idle-tab.active{background:#111827;color:#fff}.idle-upgrade-list{display:grid;gap:8px}.idle-upgrade{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid rgba(15,23,42,.1);border-radius:14px;padding:10px;background:#fff}.idle-upgrade.can{border-color:#fb923c;box-shadow:0 0 0 2px rgba(251,146,60,.12)}.idle-upgrade b{display:block}.idle-upgrade em{font-style:normal;color:#f97316}.idle-upgrade small{display:block;color:#64748b;font-size:12px}.idle-upgrade button,.idle-casino-grid button{border:0;border-radius:12px;padding:10px 12px;background:#111827;color:#fff;font-weight:900}.idle-upgrade button:disabled{background:#cbd5e1}.idle-casino-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.idle-casino-grid button{min-height:92px;background:linear-gradient(135deg,#111827,#7c2d12)}.idle-casino-grid small{display:block;color:#fed7aa;font-size:11px;margin-top:6px}.idle-public{display:grid;grid-template-columns:1fr 1fr;gap:10px}.idle-panel{border:1px solid rgba(15,23,42,.1);border-radius:16px;background:#fff;padding:10px}.idle-panel h3{margin:0 0 8px}.idle-rank,.idle-log{display:flex;justify-content:space-between;gap:8px;align-items:center;border-top:1px solid rgba(15,23,42,.06);padding:7px 0}.idle-rank:first-of-type,.idle-log:first-of-type{border-top:0}.idle-rank.me{background:#fef3c7;border-radius:10px;padding-left:6px;padding-right:6px}.idle-rank span,.idle-log span{display:flex;flex-direction:column}.idle-rank small,.idle-log small,.idle-muted{color:#64748b;font-size:12px}.idle-log strong.good{color:#16a34a}.idle-log strong.bad{color:#dc2626}@media(max-width:720px){.idle-public{grid-template-columns:1fr}.idle-casino-grid{grid-template-columns:1fr}.idle-status-grid{grid-template-columns:1fr 1fr}.idle-work-btn{padding:18px}}
+  `; document.head.appendChild(st); }
+  function ensureIdleUi(){
+    if(idleReady)return; idleReady=true; injectIdleStyle();
+    const homeGrid=document.querySelector('#homeView .app-grid,.app-grid,#homeView .home-grid,.home-grid,.game-grid');
+    if(homeGrid&&!$i('homeIdleCard')){ const card=document.createElement('button'); card.id='homeIdleCard'; card.type='button'; card.className=homeGrid.classList.contains('app-grid')?'app-card idle-card':'home-card game-card idle-card'; card.innerHTML=homeGrid.classList.contains('app-grid')?'<div class="app-icon">🛌</div><div><div class="app-name">백수 키우기</div><div class="app-desc">일하고 투자하고 가끔 도박하기</div></div>':'<span class="home-card-icon">🛌</span><strong>백수 키우기</strong><small>방치형 인생역전 RPG</small>'; card.onclick=()=>setMainView('idle'); homeGrid.appendChild(card); }
+    if(!$i('showIdleBtn')){ const btn=document.createElement('button'); btn.id='showIdleBtn'; btn.type='button'; btn.className='drawer-btn'; btn.innerHTML='<span>🛌</span> 백수 키우기'; btn.onclick=()=>setMainView('idle'); ($i('showBrickBtn')||$i('showOmokBtn')||document.querySelector('.drawer-menu button:last-child'))?.insertAdjacentElement('afterend',btn); }
+    const main=document.querySelector('main')||document.body;
+    if(!$i('idleView')){ const view=document.createElement('section'); view.id='idleView'; view.className='view-page idle-page'; view.innerHTML=`
+      <div class="game-card idle-shell">
+        <div class="game-header-row"><div><h2>백수 키우기</h2><p>일하기로 시작해서 알바, 부업, 자동화, 투자, 카지노까지 굴리는 방치형 RPG.</p></div><button id="idleRefreshBtn" class="mini-btn" type="button">랭킹 새로고침</button></div>
+        <div class="idle-login card-soft"><input id="idleNameInput" class="text-input" maxlength="20" placeholder="이름 입력"/><button id="idleLoadBtn" class="primary-btn" type="button">불러오기</button><button id="idleSaveBtn" class="ghost-btn" type="button">저장</button></div>
+        <div class="idle-status-grid"><div><span>이름</span><strong id="idlePlayerName">-</strong></div><div><span>칭호</span><strong id="idleTitleText">-</strong></div><div><span>현재 자산</span><strong id="idleMoneyText">0원</strong></div><div><span>총 번 돈</span><strong id="idleLifeText">0원</strong></div><div><span>초당 수익</span><strong id="idleCpsText">0원/s</strong></div><div><span>클릭 수익</span><strong id="idleClickText">0원</strong></div><div><span>오프라인 보상</span><strong id="idleOfflineText">-</strong></div><div><span>상태 이벤트</span><strong id="idleEventText">이벤트 없음</strong></div></div>
+        <button id="idleWorkBtn" class="idle-work-btn" type="button">일하기</button>
+        <div class="idle-tabs">${IDLE_TABS.map(([k,t])=>`<button class="idle-tab" data-tab="${k}" type="button">${t}</button>`).join('')}</div>
+        <div id="idleUpgradeList" class="idle-upgrade-list"></div>
+        <div id="idlePublicBox" class="idle-public"></div>
+      </div>`; main.appendChild(view); }
+    $i('idleNameInput').value=currentName(); $i('idleLoadBtn').onclick=idleLoadByName; $i('idleSaveBtn').onclick=()=>idleFlushSave().then(()=>idleToast('저장 완료')); $i('idleWorkBtn').onclick=idleWorkClick; $i('idleRefreshBtn').onclick=idleLoadPublic; document.querySelectorAll('.idle-tab').forEach(b=>{b.onclick=()=>setIdleTab(b.dataset.tab); b.classList.toggle('active',b.dataset.tab===(localStorage.getItem(IDLE_TAB_KEY)||'click'));}); renderIdleUpgrades(); idleLoadPublic();
+  }
+  function showIdleView(){ ensureIdleUi(); currentMainView='idle'; document.querySelectorAll('.view-page').forEach(v=>v.classList.toggle('active',v.id==='idleView')); const add=$i('addBtn'); if(add)add.style.display='none'; ['showBudgetBtn','showTetrisBtn','showDinoBtn','showBambooBtn','showJumpBtn','showOmokBtn','showBrickBtn','showIdleBtn'].forEach(id=>{const el=$i(id); if(el)el.classList.toggle('active',id==='showIdleBtn');}); if(typeof closeDrawer==='function')closeDrawer(); idleRenderAll(); }
+  const prevSetMainView=setMainView;
+  setMainView=function(view){ if(view==='idle'){showIdleView();return;} const r=prevSetMainView(view); const iv=$i('idleView'); if(iv)iv.classList.remove('active'); return r; };
+  if(typeof testGithubConnection==='function'){ const oldTest=testGithubConnection; testGithubConnection=async function(){ await oldTest(); try{ await sbFetch('/idle_players?select=id&limit=1'); await sbFetch('/idle_upgrades?select=player_id&limit=1'); await sbFetch('/idle_player_rankings?select=name&limit=1'); idleToast('백수 키우기 테이블 연결 성공'); }catch(e){ alert('백수 키우기 테이블 확인 실패: '+idleErr(e)+'\n전달한 supabase_idle_life.sql을 먼저 실행해줘.'); } }; const btn=$i('testGithubBtn'); if(btn)btn.onclick=testGithubConnection; }
+  window.addEventListener('beforeunload',()=>{try{idleFlushSave();}catch{}});
+  setTimeout(ensureIdleUi,0);
+})();
