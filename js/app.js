@@ -293,18 +293,21 @@ function initTetrisIfNeeded(){
 function handleTetrisKey(e){
  if(currentMainView!=="tetris")return;
  if(isTypingTarget(e.target))return;
+ const k=e.key.toLowerCase();
+ const pauseKey=k==="p"||k==="z";
  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," ","p","P","z","Z"].includes(e.key))e.preventDefault();
  const startKeys=["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," "];
  if(!tetrisRunning && startKeys.includes(e.key)){
    startTetris();
+   return;
  }
+ if(pauseKey){ if(!e.repeat)toggleTetrisPause(); return; }
  if(e.key==="ArrowLeft")moveTetris(-1);
  else if(e.key==="ArrowRight")moveTetris(1);
  else if(e.key==="Control")rotateTetrisPiece();
  else if(e.key==="ArrowUp")hardDropTetris();
  else if(e.key==="ArrowDown")softDropTetris();
  else if(e.key===" ")hardDropTetris();
- else if(e.key==="p"||e.key==="P"||e.key==="z"||e.key==="Z")toggleTetrisPause();
 }
 
 function resetTetrisBoard(){
