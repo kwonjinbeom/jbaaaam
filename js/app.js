@@ -293,7 +293,7 @@ function initTetrisIfNeeded(){
 function handleTetrisKey(e){
  if(currentMainView!=="tetris")return;
  if(isTypingTarget(e.target))return;
- if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," ","p","P"].includes(e.key))e.preventDefault();
+ if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," ","p","P","z","Z"].includes(e.key))e.preventDefault();
  const startKeys=["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Control"," "];
  if(!tetrisRunning && startKeys.includes(e.key)){
    startTetris();
@@ -304,7 +304,7 @@ function handleTetrisKey(e){
  else if(e.key==="ArrowUp")hardDropTetris();
  else if(e.key==="ArrowDown")softDropTetris();
  else if(e.key===" ")hardDropTetris();
- else if(e.key==="p"||e.key==="P")toggleTetrisPause();
+ else if(e.key==="p"||e.key==="P"||e.key==="z"||e.key==="Z")toggleTetrisPause();
 }
 
 function resetTetrisBoard(){
@@ -1006,14 +1006,14 @@ function initDinoIfNeeded(){
 function handleDinoKeyDown(e){
  if(currentMainView!=="dino")return;
  if(isTypingTarget(e.target))return;
- if(["ArrowUp","ArrowDown"," ","p","P"].includes(e.key))e.preventDefault();
+ if(["ArrowUp","ArrowDown"," ","p","P","z","Z"].includes(e.key))e.preventDefault();
  const startKeys=["ArrowUp","ArrowDown"," "];
  if(!dinoRunning && startKeys.includes(e.key)){
    startDino();
  }
  if(e.key==="ArrowUp"||e.key===" ")jumpDino();
  else if(e.key==="ArrowDown")setDinoDuck(true);
- else if(e.key==="p"||e.key==="P")toggleDinoPause();
+ else if(e.key==="p"||e.key==="P"||e.key==="z"||e.key==="Z")toggleDinoPause();
 }
 function handleDinoKeyUp(e){
  if(currentMainView!=="dino")return;
@@ -1402,7 +1402,7 @@ function handleBambooKeyDown(e){
  if(currentMainView!=="bamboo")return;
  if(isTypingTarget(e.target))return;
  const k=e.key.toLowerCase();
- if(["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d","p"].includes(k))e.preventDefault();
+ if(["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d","p","z"].includes(k))e.preventDefault();
  const startKeys=["arrowup","arrowdown","arrowleft","arrowright","w","a","s","d"];
  if(!bambooRunning && startKeys.includes(k)){
    startBamboo();
@@ -1411,7 +1411,7 @@ function handleBambooKeyDown(e){
  else if(k==="arrowdown"||k==="s")bambooKeys.down=true;
  else if(k==="arrowleft"||k==="a")bambooKeys.left=true;
  else if(k==="arrowright"||k==="d")bambooKeys.right=true;
- else if(k==="p")toggleBambooPause();
+ else if(k==="p"||k==="z")toggleBambooPause();
 }
 
 function handleBambooKeyUp(e){
@@ -2339,7 +2339,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     if(currentMainView!=='jump')return;
     if(isTypingTarget(e.target))return;
     const isStartKey=jumpIsStartKey(e);
-    if(['ArrowLeft','ArrowRight','ArrowUp',' ','Spacebar','Space','r','R','p','P'].includes(e.key)||e.code==='Space')e.preventDefault();
+    if(['ArrowLeft','ArrowRight','ArrowUp',' ','Spacebar','Space','r','R','p','P','z','Z'].includes(e.key)||e.code==='Space')e.preventDefault();
     if(e.key==='ArrowLeft')jumpKeys.left=true;
     if(e.key==='ArrowRight')jumpKeys.right=true;
     if(isStartKey){
@@ -2347,7 +2347,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
       jumpStartOrJump();
     }
     if(e.key==='r'||e.key==='R')jumpRestart();
-    if(e.key==='p'||e.key==='P')jumpTogglePause();
+    if(e.key==='p'||e.key==='P'||e.key==='z'||e.key==='Z')jumpTogglePause();
   }
   function jumpKeyUp(e){
     if(isTypingTarget(e.target))return;
@@ -3296,7 +3296,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function brickPointer(e){ if(e.cancelable)e.preventDefault(); brickPointerActive=true; const rect=brickCanvas.getBoundingClientRect(); const x=(e.clientX-rect.left)*(W/rect.width); if(brickPaddle)brickPaddle.x=Math.max(brickPaddle.w/2,Math.min(W-brickPaddle.w/2,x)); if(brickState==='idle')brickStartStage(brickStage); }
   function brickIsTypingTarget(target){ const el=target||document.activeElement; if(!el)return false; const tag=(el.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||tag==='select'||!!el.isContentEditable; }
   function brickIsSpaceKey(e){ return e.key===' '||e.key==='Spacebar'||e.key==='Space'||e.code==='Space'; }
-  function brickKeyDown(e){ if(currentMainView!=='brick')return; if(brickIsTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(['arrowleft','arrowright','p','r'].includes(k)||brickIsSpaceKey(e))e.preventDefault(); if(k==='arrowleft')brickKeys.left=true; else if(k==='arrowright')brickKeys.right=true; else if(brickIsSpaceKey(e)){ if(brickState==='running'||brickState==='pause')brickTogglePause(); else brickLaunchOrStart(); } else if(k==='p')brickTogglePause(); else if(k==='r')brickStartStage(brickStage); }
+  function brickKeyDown(e){ if(currentMainView!=='brick')return; if(brickIsTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(['arrowleft','arrowright','p','z','r'].includes(k)||brickIsSpaceKey(e))e.preventDefault(); if(k==='arrowleft')brickKeys.left=true; else if(k==='arrowright')brickKeys.right=true; else if(brickIsSpaceKey(e)){ if(brickState==='running'||brickState==='pause')brickTogglePause(); else brickLaunchOrStart(); } else if(k==='p'||k==='z')brickTogglePause(); else if(k==='r')brickStartStage(brickStage); }
   function brickKeyUp(e){ if(currentMainView!=='brick')return; if(brickIsTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(k==='arrowleft')brickKeys.left=false; else if(k==='arrowright')brickKeys.right=false; }
   async function brickLoadByName(){
     const name=currentPlayerName().trim(); if(!name){toast('이름을 입력해줘','error');return;}
