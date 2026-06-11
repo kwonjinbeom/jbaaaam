@@ -3541,7 +3541,9 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     const prestige=Math.max(0,Number(idlePlayer&&idlePlayer.prestige_level)||0);
     const nextRound=prestige+2;
     const moneyReq=Math.floor(250000000*Math.pow(8.5,prestige)*(1+prestige*.5));
-    const levelReq=Math.floor(180+prestige*130+prestige*prestige*38);
+    const maxCoreLv=IDLE_UPGRADES.reduce((sum,u)=>sum+Number(u.max||0),0);
+    const levelCurve=[180,330,520,760,1030,1280,1480,1620,1710,1760,1800];
+    const levelReq=Math.min(levelCurve[prestige]||1800,Math.floor(maxCoreLv*.98));
     return {prestige,nextRound,moneyReq,levelReq};
   }
   function idleRebirthInfo(){
