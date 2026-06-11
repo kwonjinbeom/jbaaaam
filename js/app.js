@@ -3483,18 +3483,20 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   };
   IDLE_UPGRADES.forEach(u=>Object.assign(u,IDLE_BALANCE[u.key]||{}));
   const IDLE_UNLOCKS={
-    typing:{cat:'click',level:12},focus:{cat:'click',level:30},critical:{cat:'click',level:55},skill_book:{cat:'click',level:85},
-    delivery:{cat:'job',level:10},warehouse:{cat:'job',level:25},cafe:{cat:'job',level:45},event_staff:{cat:'job',level:70},agency_team:{cat:'job',level:100},
-    blog:{cat:'side',level:12},shorts:{cat:'side',level:30},design_gig:{cat:'side',level:55},coding_gig:{cat:'side',level:85},networking:{cat:'side',level:115},template_shop:{cat:'side',level:145},online_class:{cat:'side',level:180},
-    macro:{total:35},excel_auto:{cat:'auto',level:10},ai_doc:{cat:'auto',level:25},ai_code:{cat:'auto',level:45},notion_system:{cat:'auto',level:70},agency_bot:{cat:'auto',level:100},sales_funnel:{cat:'auto',level:135},micro_saas:{cat:'auto',level:170},
-    saving:{total:55},dividend:{cat:'invest',level:10},bond:{cat:'invest',level:25},etf:{cat:'invest',level:45},estate_piece:{cat:'invest',level:75},parking_lot:{cat:'invest',level:110},building:{cat:'invest',level:150},franchise:{cat:'invest',level:190},
-    chair:{total:18},monitor:{cat:'life',level:8},pc:{cat:'life',level:20},sleep:{cat:'life',level:36},mental:{cat:'life',level:55},morning_routine:{cat:'life',level:78}
+    coffee:{key:'finger',level:8},typing:{key:'coffee',level:8},focus:{key:'coffee',level:15},critical:{key:'focus',level:12},skill_book:{all:[{key:'typing',level:18},{key:'critical',level:8}]},
+    conveni:{cat:'click',level:18},delivery:{key:'conveni',level:10},warehouse:{key:'delivery',level:12},cafe:{key:'warehouse',level:12},event_staff:{key:'cafe',level:14},agency_team:{key:'event_staff',level:16},
+    used_market:{cat:'job',level:35},blog:{key:'used_market',level:12},shorts:{key:'blog',level:12},design_gig:{key:'shorts',level:14},coding_gig:{key:'design_gig',level:14},networking:{key:'coding_gig',level:14},template_shop:{key:'networking',level:12},online_class:{key:'template_shop',level:12},
+    macro:{cat:'side',level:45},excel_auto:{key:'macro',level:10},ai_doc:{key:'excel_auto',level:12},ai_code:{key:'ai_doc',level:12},notion_system:{key:'ai_code',level:12},agency_bot:{key:'notion_system',level:12},sales_funnel:{key:'agency_bot',level:12},micro_saas:{key:'sales_funnel',level:10},
+    saving:{cat:'auto',level:42},dividend:{key:'saving',level:10},bond:{key:'dividend',level:12},etf:{key:'bond',level:12},estate_piece:{key:'etf',level:14},parking_lot:{key:'estate_piece',level:12},building:{key:'parking_lot',level:12},franchise:{key:'building',level:10},
+    chair:{all:[{cat:'click',level:15},{cat:'job',level:10}]},monitor:{key:'chair',level:8},pc:{key:'monitor',level:10},sleep:{key:'pc',level:10},mental:{all:[{key:'sleep',level:8},{cat:'side',level:35}]},morning_routine:{all:[{key:'mental',level:8},{cat:'invest',level:25}]}
   };
   const UPG=Object.fromEntries(IDLE_UPGRADES.map(u=>[u.key,u]));
   function idleLevel(key){return Math.max(0,Number(idleUpgrades[key]||0));}
   function idleCatLevel(cat){return IDLE_UPGRADES.filter(u=>u.cat===cat).reduce((sum,u)=>sum+idleLevel(u.key),0)}
   function idleCost(u,lv=idleLevel(u.key)){ const discount=Math.max(.78,1-idleLevel('legacy_discount')*.012); return Math.ceil(u.base*Math.pow(u.growth,lv)*Math.pow(1.035,Math.floor(lv/10)*lv)*discount); }
-  function idleUnlockInfo(u){ const req=IDLE_UNLOCKS[u.key]; if(!req)return {ok:true,text:''}; if(req.total){ const total=idleTotalUpgradeLevel(); return {ok:total>=req.total,text:`전체 업그레이드 Lv.${req.total} 필요`}; } const cur=idleCatLevel(req.cat); const label=(IDLE_TABS.find(([k])=>k===req.cat)||[])[1]||req.cat; return {ok:cur>=req.level,text:`${label} 합산 Lv.${req.level} 필요`}; }
+  function idleReqLabel(req){ if(req.key){ const upg=UPG[req.key]; return `${upg?upg.name:req.key} Lv.${req.level} 필요`; } if(req.cat){ const label=(IDLE_TABS.find(([k])=>k===req.cat)||[])[1]||req.cat; return `${label} 합산 Lv.${req.level} 필요`; } if(req.total)return `전체 업그레이드 Lv.${req.total} 필요`; return ''; }
+  function idleReqOk(req){ if(req.key)return idleLevel(req.key)>=req.level; if(req.cat)return idleCatLevel(req.cat)>=req.level; if(req.total)return idleTotalUpgradeLevel()>=req.total; return true; }
+  function idleUnlockInfo(u){ const req=IDLE_UNLOCKS[u.key]; if(!req)return {ok:true,text:''}; const reqs=req.all?req.all:[req]; const unmet=reqs.filter(r=>!idleReqOk(r)); const text=(unmet.length?unmet:reqs).map(idleReqLabel).filter(Boolean).join(' · '); return {ok:!unmet.length,text}; }
   function idleTitleList(){ return [
     {name:'이불 밖은 위험해',round:1},
     {name:'다시 태어난 백수',round:2},
