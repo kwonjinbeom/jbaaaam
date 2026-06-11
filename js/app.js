@@ -3251,7 +3251,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
             <button id="brickLaunchBtn" type="button">발사/시작</button>
             <button id="brickRightBtn" type="button">→</button>
           </div>
-          <div id="brickHelp" class="brick-help">조작: PC ←/→/Space, 모바일 버튼/드래그 · 후반에는 벽돌 체력/공속/보스가 증가 · 금색=보너스, 파랑=멀티볼, 보라=관통, 빨강/보라=강화벽돌</div>
+          <div id="brickHelp" class="brick-help">조작: PC ←/→ 이동, Space 시작/일시정지, 모바일 버튼/드래그 · 후반에는 벽돌 체력/공속/보스가 증가 · 금색=보너스, 파랑=멀티볼, 보라=관통, 빨강/보라=강화벽돌</div>
           <div id="brickStatsBox" class="brick-stats"></div>
         </div>`;
       main.appendChild(view);
@@ -3291,8 +3291,10 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   }
   function bindHoldButton(id,key){ const btn=$b(id); btn.addEventListener('pointerdown',e=>{e.preventDefault();brickKeys[key]=true;if(brickState==='idle')brickStartStage(brickStage);},{passive:false}); ['pointerup','pointerleave','pointercancel'].forEach(ev=>btn.addEventListener(ev,()=>brickKeys[key]=false)); }
   function brickPointer(e){ if(e.cancelable)e.preventDefault(); brickPointerActive=true; const rect=brickCanvas.getBoundingClientRect(); const x=(e.clientX-rect.left)*(W/rect.width); if(brickPaddle)brickPaddle.x=Math.max(brickPaddle.w/2,Math.min(W-brickPaddle.w/2,x)); if(brickState==='idle')brickStartStage(brickStage); }
-  function brickKeyDown(e){ if(currentMainView!=='brick')return; if(typeof isTypingTarget==='function'&&isTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(['arrowleft','arrowright',' ','p','r'].includes(k))e.preventDefault(); if(k==='arrowleft')brickKeys.left=true; else if(k==='arrowright')brickKeys.right=true; else if(k===' ')brickLaunchOrStart(); else if(k==='p')brickTogglePause(); else if(k==='r')brickStartStage(brickStage); }
-  function brickKeyUp(e){ if(currentMainView!=='brick')return; if(typeof isTypingTarget==='function'&&isTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(k==='arrowleft')brickKeys.left=false; else if(k==='arrowright')brickKeys.right=false; }
+  function brickIsTypingTarget(target){ const el=target||document.activeElement; if(!el)return false; const tag=(el.tagName||'').toLowerCase(); return tag==='input'||tag==='textarea'||tag==='select'||!!el.isContentEditable; }
+  function brickIsSpaceKey(e){ return e.key===' '||e.key==='Spacebar'||e.key==='Space'||e.code==='Space'; }
+  function brickKeyDown(e){ if(currentMainView!=='brick')return; if(brickIsTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(['arrowleft','arrowright','p','r'].includes(k)||brickIsSpaceKey(e))e.preventDefault(); if(k==='arrowleft')brickKeys.left=true; else if(k==='arrowright')brickKeys.right=true; else if(brickIsSpaceKey(e)){ if(brickState==='running'||brickState==='pause')brickTogglePause(); else brickLaunchOrStart(); } else if(k==='p')brickTogglePause(); else if(k==='r')brickStartStage(brickStage); }
+  function brickKeyUp(e){ if(currentMainView!=='brick')return; if(brickIsTypingTarget(e.target))return; const k=e.key.toLowerCase(); if(k==='arrowleft')brickKeys.left=false; else if(k==='arrowright')brickKeys.right=false; }
   async function brickLoadByName(){
     const name=currentPlayerName().trim(); if(!name){toast('이름을 입력해줘','error');return;}
     try{ brickMessage='불러오는 중...'; brickDraw(); brickPlayer=await brickFetchPlayer(name); localStorage.setItem(BRICK_NAME_KEY,name); brickStage=Number(localStorage.getItem(BRICK_STAGE_KEY))||Number(brickPlayer.current_stage)||Number(brickPlayer.max_stage)||1; brickStage=Math.max(1,Math.min(getMaxUnlocked(),brickStage)); brickResetStage(brickStage); renderBrickInfo(); brickLoadPublicStats(); toast('벽돌깨기 세이브 불러옴'); }
@@ -3304,7 +3306,8 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     brickState='idle'; brickCleared=false; brickScore=0; brickMoneyEarned=0; brickParticles=[]; brickPowerups=[]; brickBricks=makeBrickStage(stage);
     const paddleLv=Number(brickPlayer&&brickPlayer.paddle_level)||1; const ballLv=Number(brickPlayer&&brickPlayer.ball_level)||1;
     const diff=getBrickDifficulty(stage);
-    brickPaddle={x:W/2,y:H-38,w:Math.max(54,74+Math.min(54,(paddleLv-1)*10)-diff.paddlePenalty),h:12,speed:285+Math.min(35,diff.tier*4)};
+    const earlyPaddleBonus=stage<=1?42:(stage===2?28:0);
+    brickPaddle={x:W/2,y:H-38,w:Math.max(54,74+earlyPaddleBonus+Math.min(54,(paddleLv-1)*10)-diff.paddlePenalty),h:12,speed:285+Math.min(35,diff.tier*4)};
     brickBalls=[]; const count=Math.min(4,ballLv); for(let i=0;i<count;i++)brickBalls.push(makeBall(i,count));
     brickMessage=brickPlayer?'시작 버튼 또는 Space로 발사':'이름을 입력하고 불러오기';
     stopBrickLoop(); brickDraw();
@@ -3319,11 +3322,12 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     const up=getBrickUpgradePressure();
     return {stage:st,upgrade:up,tier:Math.floor((st-1)/10),hpBonus:Math.floor(st/9)+Math.floor(up/7),speedBonus:Math.min(170,st*3+up*5),paddlePenalty:Math.min(36,Math.floor(st/10)*4+Math.floor(up/10)*3)};
   }
-  function makeBall(i,count){ const d=getBrickDifficulty(brickStage); const spread=(i-(count-1)/2)*0.35; return {x:W/2+(i-(count-1)/2)*12,y:H-56,r:6,vx:95*Math.sin(spread),vy:-270-d.speedBonus*0.45,stuck:true,pierce:getBrickPassivePierce()}; }
+  function getBrickLaunchSpeed(stage=brickStage){ const d=getBrickDifficulty(stage); const early={1:238,2:256}[Math.max(1,Number(stage)||1)]; return early||285+d.speedBonus; }
+  function makeBall(i,count){ const spread=(i-(count-1)/2)*0.35; return {x:W/2+(i-(count-1)/2)*12,y:H-56,r:6,vx:80*Math.sin(spread),vy:-getBrickLaunchSpeed(brickStage)*0.92,stuck:true,pierce:getBrickPassivePierce()}; }
   function makeBrickStage(stage){
     const d=getBrickDifficulty(stage);
-    const rows=Math.min(10,5+Math.floor(stage/7));
-    const cols=8;
+    const rows=stage<=1?3:(stage===2?4:Math.min(10,5+Math.floor(stage/7)));
+    const cols=stage<=1?6:(stage===2?7:8);
     const arr=[];
     const top=48;
     const gap=4;
@@ -3339,8 +3343,8 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
       let type='normal';
       let hp=1+d.hpBonus+Math.floor(r/3);
       let reward=4+Math.floor(stage/5)+Math.floor(hp*2);
-      if(seed>76){type='hard';hp+=1+Math.floor(stage/18);reward+=9;}
-      if(seed>88){type='gold';hp+=Math.floor(stage/20);reward+=28+stage;}
+      if(stage>1&&seed>76){type='hard';hp+=1+Math.floor(stage/18);reward+=9;}
+      if(stage>2&&seed>88){type='gold';hp+=Math.floor(stage/20);reward+=28+stage;}
       if(stage>5&&seed>=68&&seed<75){type='multi';hp+=1;reward+=12;}
       if(stage>12&&seed>=60&&seed<66){type='pierce';hp+=1+Math.floor(stage/25);reward+=14;}
       if(stage>18&&seed>=50&&seed<58){type='steel';hp+=2+Math.floor(stage/16);reward+=20;}
@@ -3356,7 +3360,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   }
   function brickLaunchOrStart(){ if(!brickPlayer){brickLoadByName();return;} if(brickState==='idle'||brickState==='over'||brickState==='clear')brickStartStage(brickStage); else if(brickState==='ready')brickLaunchBalls(); }
   function brickStartStage(stage){ if(!brickPlayer){brickLoadByName();return;} brickStage=Math.max(1,Math.min(getMaxUnlocked(),Number(stage)||1)); localStorage.setItem(BRICK_STAGE_KEY,String(brickStage)); brickResetStage(brickStage); brickState='running'; brickLaunchBalls(); startBrickLoop(); }
-  function brickLaunchBalls(){ brickBalls.forEach((b,i)=>{ if(b.stuck){ b.stuck=false; const angle=(-Math.PI/2)+(i-(brickBalls.length-1)/2)*0.22; const diff=getBrickDifficulty(brickStage); const speed=285+diff.speedBonus; b.vx=Math.cos(angle)*speed; b.vy=Math.sin(angle)*speed; }}); brickMessage=''; }
+  function brickLaunchBalls(){ brickBalls.forEach((b,i)=>{ if(b.stuck){ b.stuck=false; const angle=(-Math.PI/2)+(i-(brickBalls.length-1)/2)*0.22; const speed=getBrickLaunchSpeed(brickStage); b.vx=Math.cos(angle)*speed; b.vy=Math.sin(angle)*speed; }}); brickMessage=''; }
   function brickTogglePause(){ if(brickState==='running'){brickState='pause';stopBrickLoop();brickMessage='PAUSE';brickDraw();} else if(brickState==='pause'){brickState='running';brickMessage='';startBrickLoop();} }
   function startBrickLoop(){ stopBrickLoop(); brickLastTs=0; brickLoopId=requestAnimationFrame(brickLoop); }
   function stopBrickLoop(){ if(brickLoopId)cancelAnimationFrame(brickLoopId); brickLoopId=null; }
