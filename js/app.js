@@ -3516,20 +3516,20 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function idleTitle(roundOrPrestige){ const round=Math.max(1,Number(roundOrPrestige)||1); const titles=idleTitleList(); let title=titles[0].name; titles.forEach(t=>{ if(round>=t.round)title=t.name; }); return title; }
   function idleCurrentRound(p=idlePlayer){ return Number(p&&p.prestige_level||0)+1; }
   function idleSpendItems(){ return [
-    {key:'spend_room_desk',group:'방 꾸미기',name:'튼튼한 책상',cost:120000,score:18,clickMult:.012,incomeMult:.002,desc:'작업 공간이 생겨 클릭 효율이 조금 좋아짐'},
-    {key:'spend_room_chair',group:'방 꾸미기',name:'허리 살리는 의자',cost:420000,score:34,clickMult:.015,incomeMult:.006,desc:'오래 앉아도 버티는 기본 장비'},
-    {key:'spend_room_monitor',group:'방 꾸미기',name:'울트라와이드 모니터',cost:1500000,score:58,clickMult:.018,incomeMult:.010,desc:'작업 효율과 자동수익이 소폭 증가'},
-    {key:'spend_room_studio',group:'방 꾸미기',name:'작은 작업실',cost:8000000,score:110,clickMult:.020,incomeMult:.020,offline:.25,desc:'이제 집이 아니라 작업실 느낌'},
-    {key:'spend_room_office',group:'방 꾸미기',name:'개인 사무실',cost:42000000,score:210,incomeMult:.035,offline:.40,desc:'사업가 느낌이 나기 시작함'},
-    {key:'spend_flex_keyboard',group:'플렉스 수집품',name:'골드 키보드',cost:700000,score:28,clickMult:.020,desc:'쓸데없이 번쩍이지만 누를 맛이 남'},
-    {key:'spend_flex_shoes',group:'플렉스 수집품',name:'한정판 운동화',cost:2600000,score:65,incomeMult:.006,desc:'돈 쓰는 맛을 알려주는 수집품'},
-    {key:'spend_flex_watch',group:'플렉스 수집품',name:'성공한 사람 시계',cost:18000000,score:160,incomeMult:.018,desc:'효과보다 기분이 더 큼'},
-    {key:'spend_flex_car',group:'플렉스 수집품',name:'첫 슈퍼카',cost:120000000,score:360,incomeMult:.030,desc:'랭킹용 플렉스 점수가 크게 오름'},
-    {key:'spend_life_deposit',group:'인생 목표',name:'월세 탈출 보증금',cost:10000000,score:120,offline:.35,desc:'돈을 써도 삶이 안정되는 첫 목표'},
-    {key:'spend_life_home',group:'인생 목표',name:'내 집 마련',cost:300000000,score:620,incomeMult:.050,offline:.75,desc:'큰돈을 태우는 장기 목표'},
-    {key:'spend_life_freedom',group:'인생 목표',name:'경제적 자유 선언',cost:1500000000,score:1600,incomeMult:.080,offline:1.00,desc:'인생 2회차 조건을 크게 앞당기는 상징 목표'}
+    {key:'spend_room_desk',group:'방 꾸미기',name:'튼튼한 책상',cost:120000,clickMult:.012,incomeMult:.002,desc:'작업 공간이 생겨 클릭 효율이 조금 좋아짐'},
+    {key:'spend_room_chair',group:'방 꾸미기',name:'허리 살리는 의자',cost:420000,clickMult:.015,incomeMult:.006,desc:'오래 앉아도 버티는 기본 장비'},
+    {key:'spend_room_monitor',group:'방 꾸미기',name:'울트라와이드 모니터',cost:1500000,clickMult:.018,incomeMult:.010,desc:'작업 효율과 자동수익이 소폭 증가'},
+    {key:'spend_room_studio',group:'방 꾸미기',name:'작은 작업실',cost:8000000,clickMult:.020,incomeMult:.020,offline:.25,desc:'이제 집이 아니라 작업실 느낌'},
+    {key:'spend_room_office',group:'방 꾸미기',name:'개인 사무실',cost:42000000,incomeMult:.035,offline:.40,desc:'사업가 느낌이 나기 시작함'},
+    {key:'spend_flex_keyboard',group:'플렉스',name:'골드 키보드',cost:700000,clickMult:.020,desc:'쓸데없이 번쩍이지만 누를 맛이 남'},
+    {key:'spend_flex_shoes',group:'플렉스',name:'한정판 운동화',cost:2600000,incomeMult:.006,desc:'돈 쓰는 맛을 알려주는 장비'},
+    {key:'spend_flex_watch',group:'플렉스',name:'성공한 사람 시계',cost:18000000,incomeMult:.018,desc:'효과보다 기분이 더 큼'},
+    {key:'spend_flex_car',group:'플렉스',name:'첫 슈퍼카',cost:120000000,incomeMult:.030,desc:'크게 질러서 자동수익 보너스를 얻음'},
+    {key:'spend_life_deposit',group:'인생 목표',name:'월세 탈출 보증금',cost:10000000,offline:.35,desc:'돈을 써도 삶이 안정되는 첫 목표'},
+    {key:'spend_life_home',group:'인생 목표',name:'내 집 마련',cost:300000000,incomeMult:.050,offline:.75,desc:'큰돈을 태우는 장기 목표'},
+    {key:'spend_life_freedom',group:'인생 목표',name:'경제적 자유 선언',cost:1500000000,incomeMult:.080,offline:1.00,desc:'인생 2회차 조건을 크게 앞당기는 상징 목표'}
   ]; }
-  function idleSpendBonus(){ const b={click:0,income:0,offline:0,score:0,count:0}; idleSpendItems().forEach(it=>{ if(idleClaimed(it.key)){ b.click+=n(it.clickMult); b.income+=n(it.incomeMult); b.offline+=n(it.offline); b.score+=n(it.score); b.count++; }}); return b; }
+  function idleSpendBonus(){ const b={click:0,income:0,offline:0,count:0}; idleSpendItems().forEach(it=>{ if(idleClaimed(it.key)){ b.click+=n(it.clickMult); b.income+=n(it.incomeMult); b.offline+=n(it.offline); b.count++; }}); return b; }
   function idleLegacyPoints(){return idleLevel('legacy_points');}
   function idleLegacyPerks(){return [
     {key:'legacy_income',name:'돈 냄새',max:25,cost:1,desc:'전체 자동수익 +3% / Lv'},
@@ -3542,17 +3542,15 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     const nextRound=prestige+2;
     const moneyReq=Math.floor(250000000*Math.pow(8.5,prestige)*(1+prestige*.5));
     const levelReq=Math.floor(180+prestige*130+prestige*prestige*38);
-    const spendReq=prestige<1?0:Math.floor(420+prestige*520+prestige*prestige*120);
-    return {prestige,nextRound,moneyReq,levelReq,spendReq};
+    return {prestige,nextRound,moneyReq,levelReq};
   }
   function idleRebirthInfo(){
     const life=n(idlePlayer&&idlePlayer.lifetime_money), totalLv=idleTotalUpgradeLevel(), spend=idleSpendBonus(), req=idleRebirthRequirement();
-    const ok=life>=req.moneyReq&&totalLv>=req.levelReq&&spend.score>=req.spendReq;
+    const ok=life>=req.moneyReq&&totalLv>=req.levelReq;
     const moneyRatio=req.moneyReq?life/req.moneyReq:0;
     const levelRatio=req.levelReq?totalLv/req.levelReq:0;
-    const spendRatio=req.spendReq?spend.score/req.spendReq:1;
-    const points=ok?Math.max(1,Math.floor(Math.sqrt(Math.max(1,moneyRatio)))+Math.floor(spend.score/(450+req.prestige*220))+req.prestige+1):0;
-    return {ok,points,life,totalLv,spend,req,moneyRatio,levelRatio,spendRatio};
+    const points=ok?Math.max(1,Math.floor(Math.sqrt(Math.max(1,moneyRatio)))+req.prestige+1):0;
+    return {ok,points,life,totalLv,spend,req,moneyRatio,levelRatio};
   }
   function deriveIdleStats(){
     let click=10,income=0,clickMult=1,incomeMult=1,crit=0,offlineHours=2,eventLuck=0,totalLv=0;
@@ -3746,23 +3744,22 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   function setIdleSection(sec){ localStorage.setItem(IDLE_SECTION_KEY,sec); document.querySelectorAll('.idle-section-tab').forEach(b=>b.classList.toggle('active',b.dataset.section===sec)); renderIdleExtra(); }
   function renderIdleQuickPanel(){ const box=$i('idleQuickBox'); if(!box)return; idleStats=deriveIdleStats(); const dailyKey=idleDailyKey(); const dailyDone=idlePlayer&&idleClaimed(dailyKey); const until=idlePlayer&&idlePlayer.active_event_until?new Date(idlePlayer.active_event_until).getTime():0; const eventText=idlePlayer&&until>Date.now()?`${eventName(idlePlayer.active_event_key)} ${Math.ceil((until-Date.now())/1000)}초 남음`:'진행 중인 이벤트 없음'; box.innerHTML=`<div class="idle-quick-card"><b>오늘 보너스</b><small>${dailyDone?'오늘은 이미 받았어':'하루 한 번 가볍게 받는 성장 보너스'}</small><button type="button" id="idleDailyBtn" ${!idlePlayer||dailyDone?'disabled':''}>${dailyDone?'완료':won(idleDailyReward())}</button></div><div class="idle-quick-card"><b>상태</b><small>${html(eventText)}</small><button type="button" id="idleQuickSaveBtn" ${!idlePlayer?'disabled':''}>저장</button></div>`; const d=$i('idleDailyBtn'); if(d)d.onclick=idleClaimDaily; const sv=$i('idleQuickSaveBtn'); if(sv)sv.onclick=()=>idleFlushSave().then(()=>idleToast('저장 완료')); }
   async function idleBuySpend(key){ if(!idlePlayer){idleToast('이름을 먼저 불러와줘','error');return;} const it=idleSpendItems().find(x=>x.key===key); if(!it)return; if(idleClaimed(key)){idleToast('이미 구매했어');return;} if(n(idlePlayer.money)<it.cost){idleToast(`돈 부족: ${won(it.cost)}`,'error');return;} idlePlayer.money=n(idlePlayer.money)-it.cost; idleUpgrades[key]=1; await idleSaveUpgrade(key,1); await idleSavePlayer({money:n(idlePlayer.money),lifetime_money:n(idlePlayer.lifetime_money)}); idleRenderAll(); idleToast(`${it.name} 구매 완료`); }
-  function renderIdleSpend(){ const box=$i('idleSpendBox'); if(!box)return; const spend=idleSpendBonus(); const groups={}; idleSpendItems().forEach(it=>{(groups[it.group]||(groups[it.group]=[])).push(it);}); box.innerHTML=`<div class="idle-panel idle-spend-head"><h3>돈 쓰기</h3><p class="idle-muted">돈을 벌기만 하지 말고 방, 플렉스, 인생 목표에 써서 영구 보너스와 수집 점수를 쌓아. 기존 수익 밸런스를 크게 흔들지 않게 보너스는 작게 잡았어.</p><div class="idle-spend-score"><span>구매 ${spend.count}개</span><span>수집 점수 ${spend.score}</span><span>보너스 자동수익 +${Math.round(spend.income*1000)/10}%</span></div></div>`+Object.entries(groups).map(([g,arr])=>`<div class="idle-panel"><h3>${html(g)}</h3>${arr.map(it=>{const done=idleClaimed(it.key),can=idlePlayer&&!done&&n(idlePlayer.money)>=it.cost; return `<div class="idle-spend-item ${done?'done':can?'can':''}"><span><b>${html(it.name)}</b><small>${html(it.desc)}</small><small>가격 ${won(it.cost)} · 점수 +${it.score}</small></span><button type="button" data-spend="${it.key}" ${done||!can?'disabled':''}>${done?'보유':can?'구매':'부족'}</button></div>`;}).join('')}</div>`).join(''); box.querySelectorAll('[data-spend]').forEach(b=>b.onclick=()=>idleBuySpend(b.dataset.spend)); }
+  function renderIdleSpend(){ const box=$i('idleSpendBox'); if(!box)return; const spend=idleSpendBonus(); const groups={}; idleSpendItems().forEach(it=>{(groups[it.group]||(groups[it.group]=[])).push(it);}); box.innerHTML=`<div class="idle-panel idle-spend-head"><h3>돈 쓰기</h3><p class="idle-muted">돈을 벌기만 하지 말고 방, 플렉스, 인생 목표에 써서 영구 보너스를 챙겨. 기존 수익 밸런스를 크게 흔들지 않게 보너스는 작게 잡았어.</p><div class="idle-spend-score"><span>구매 ${spend.count}개</span><span>보너스 자동수익 +${Math.round(spend.income*1000)/10}%</span></div></div>`+Object.entries(groups).map(([g,arr])=>`<div class="idle-panel"><h3>${html(g)}</h3>${arr.map(it=>{const done=idleClaimed(it.key),can=idlePlayer&&!done&&n(idlePlayer.money)>=it.cost; return `<div class="idle-spend-item ${done?'done':can?'can':''}"><span><b>${html(it.name)}</b><small>${html(it.desc)}</small><small>가격 ${won(it.cost)}</small></span><button type="button" data-spend="${it.key}" ${done||!can?'disabled':''}>${done?'보유':can?'구매':'부족'}</button></div>`;}).join('')}</div>`).join(''); box.querySelectorAll('[data-spend]').forEach(b=>b.onclick=()=>idleBuySpend(b.dataset.spend)); }
   async function idleBuyLegacyPerk(key){ if(!idlePlayer)return; const p=idleLegacyPerks().find(x=>x.key===key); if(!p)return; const lv=idleLevel(key); if(lv>=p.max){idleToast('이미 최대 레벨이야');return;} if(idleLegacyPoints()<p.cost){idleToast('인생 포인트 부족','error');return;} idleUpgrades.legacy_points=idleLegacyPoints()-p.cost; idleUpgrades[key]=lv+1; await idleSaveUpgrade('legacy_points',idleUpgrades.legacy_points); await idleSaveUpgrade(key,lv+1); await idleSavePlayer({money:n(idlePlayer.money),lifetime_money:n(idlePlayer.lifetime_money)}); idleRenderAll(); idleToast(`${p.name} Lv.${lv+1}`); }
   async function idleDoRebirth(opts={}){ if(!idlePlayer)return; if(idleRebirthBusy){idleToast('인생 회차 처리 중이야. 잠깐만 기다려줘.','error');return;} idleStats=deriveIdleStats(); const info=idleRebirthInfo(); if(!info.ok){idleToast(`아직 인생 ${info.req.nextRound}회차 조건이 부족해`,'error');return;} const ok=opts.skipConfirm||confirm(`인생 ${info.req.nextRound}회차를 시작할까?
-현재 돈/일반 업그레이드/목표 보상 기록은 초기화되고, 돈 쓰기 수집품과 인생 포인트는 유지돼.
+현재 돈/일반 업그레이드/목표 보상 기록은 초기화되고, 돈 쓰기 구매 항목과 인생 포인트는 유지돼.
 획득 포인트: ${info.points}`); if(!ok)return; idleRebirthBusy=true; const btn=$i('idleRebirthBtn'); if(btn){btn.disabled=true;btn.textContent='처리 중...';} try{ const rebirthPlayerId=idlePlayer.id; const beforePrestige=n(idlePlayer.prestige_level); const keep={}; Object.keys(idleUpgrades).forEach(k=>{ if(k.startsWith('legacy_')||k.startsWith('spend_'))keep[k]=idleUpgrades[k]; }); for(const k of Object.keys(idleUpgrades)){ if(!(k.startsWith('legacy_')||k.startsWith('spend_'))){ try{ await sbFetch(`/idle_upgrades?player_id=eq.${encodeURIComponent(rebirthPlayerId)}&upgrade_key=eq.${encodeURIComponent(k)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}}); }catch(e){} } }
     keep.legacy_points=Number(keep.legacy_points||0)+info.points; idleUpgrades=keep; await idleSaveUpgrade('legacy_points',keep.legacy_points); idlePlayer.money=0; idlePlayer.lifetime_money=0; idlePlayer.total_clicks=0; idlePlayer.prestige_level=beforePrestige+1; idlePlayer.active_event_key=null; idlePlayer.active_event_until=null; await idleSavePlayer({money:0,lifetime_money:0,total_clicks:0,prestige_level:beforePrestige+1,active_event_key:null,active_event_until:null}); await idleLoadUpgrades(); idleRenderAll(); idleToast(`인생 ${beforePrestige+2}회차 시작 · 포인트 +${info.points}`); }catch(e){ console.warn(e); idleToast('회차 처리 중 오류가 났어. 새로고침 후 다시 확인해줘.','error'); } finally { idleRebirthBusy=false; idleRenderAll(); } }
   function idleRebirthNoticeKey(info){ return `${IDLE_REBIRTH_NOTICE_KEY}_${idlePlayer&&idlePlayer.id||idlePlayer&&idlePlayer.name||'anon'}_${info.req.nextRound}`; }
-  function idleMaybePromptRebirth(){ if(!idlePlayer||idleRebirthBusy||idleRebirthPromptOpen)return; const info=idleRebirthInfo(); if(!info.ok)return; const key=idleRebirthNoticeKey(info); if(localStorage.getItem(key)==='Y')return; idleRebirthPromptOpen=true; setTimeout(()=>{ try{ if(!idlePlayer)return; const latest=idleRebirthInfo(); if(!latest.ok)return; const latestKey=idleRebirthNoticeKey(latest); if(localStorage.getItem(latestKey)==='Y')return; const ok=confirm(`인생 ${latest.req.nextRound}회차 자격 조건을 달성했어.\n지금 시작하시겠습니까?\n\n현재 돈/일반 업그레이드/목표 보상 기록은 초기화되고, 돈 쓰기 수집품과 인생 포인트는 유지돼.\n획득 예정 포인트: ${latest.points}P`); localStorage.setItem(latestKey,'Y'); if(ok)idleDoRebirth({skipConfirm:true}); }finally{ idleRebirthPromptOpen=false; } },0); }
+  function idleMaybePromptRebirth(){ if(!idlePlayer||idleRebirthBusy||idleRebirthPromptOpen)return; const info=idleRebirthInfo(); if(!info.ok)return; const key=idleRebirthNoticeKey(info); if(localStorage.getItem(key)==='Y')return; idleRebirthPromptOpen=true; setTimeout(()=>{ try{ if(!idlePlayer)return; const latest=idleRebirthInfo(); if(!latest.ok)return; const latestKey=idleRebirthNoticeKey(latest); if(localStorage.getItem(latestKey)==='Y')return; const ok=confirm(`인생 ${latest.req.nextRound}회차 자격 조건을 달성했어.\n지금 시작하시겠습니까?\n\n현재 돈/일반 업그레이드/목표 보상 기록은 초기화되고, 돈 쓰기 구매 항목과 인생 포인트는 유지돼.\n획득 예정 포인트: ${latest.points}P`); localStorage.setItem(latestKey,'Y'); if(ok)idleDoRebirth({skipConfirm:true}); }finally{ idleRebirthPromptOpen=false; } },0); }
   function renderIdleRebirth(){
     const box=$i('idleRebirthBox'); if(!box)return;
     const info=idleRebirthInfo(), req=info.req, points=idleLegacyPoints();
     const currentRound=req.nextRound-1;
-    const moneyOk=info.life>=req.moneyReq, lvOk=info.totalLv>=req.levelReq, spendOk=info.spend.score>=req.spendReq;
+    const moneyOk=info.life>=req.moneyReq, lvOk=info.totalLv>=req.levelReq;
     const conds=[
       `<span class="${moneyOk?'ok':''}">총 번 돈 ${compact(info.life)} / ${compact(req.moneyReq)}원</span>`,
-      `<span class="${lvOk?'ok':''}">업그레이드 Lv.${info.totalLv} / Lv.${req.levelReq}</span>`,
-      req.spendReq?`<span class="${spendOk?'ok':''}">수집 점수 ${info.spend.score} / ${req.spendReq}</span>`:`<span class="ok">수집 점수 조건 없음</span>`
+      `<span class="${lvOk?'ok':''}">업그레이드 Lv.${info.totalLv} / Lv.${req.levelReq}</span>`
     ].join('');
     box.innerHTML=`<div class="idle-panel idle-rebirth-panel"><h3>인생 ${req.nextRound}회차 준비</h3><p class="idle-muted">현재 ${currentRound}회차야. 회차가 올라갈수록 필요 금액과 업그레이드 조건이 훨씬 빡세져서, 후반 루프가 너무 빨리 뚫리지 않게 잡았어.</p><div class="idle-rebirth-status"><b>${info.ok?'가능':'진행중'}</b><small>예상 포인트 ${info.points}P</small>${conds}</div><button id="idleRebirthBtn" type="button" ${!idlePlayer||!info.ok||idleRebirthBusy?'disabled':''}>${idleRebirthBusy?'처리 중...':`인생 ${req.nextRound}회차 시작`}</button></div><div class="idle-panel"><h3>인생 포인트 특성 <small>보유 ${points}P</small></h3>${idleLegacyPerks().map(p=>{const lv=idleLevel(p.key),can=idlePlayer&&points>=p.cost&&lv<p.max; return `<div class="idle-spend-item ${can?'can':''}"><span><b>${html(p.name)} Lv.${lv}/${p.max}</b><small>${html(p.desc)}</small></span><button type="button" data-legacy="${p.key}" ${!can?'disabled':''}>${lv>=p.max?'MAX':p.cost+'P'}</button></div>`;}).join('')}</div>`;
     const rb=$i('idleRebirthBtn'); if(rb)rb.onclick=idleDoRebirth;
