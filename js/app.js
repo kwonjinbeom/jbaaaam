@@ -3306,8 +3306,7 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
     brickState='idle'; brickCleared=false; brickScore=0; brickMoneyEarned=0; brickParticles=[]; brickPowerups=[]; brickBricks=makeBrickStage(stage);
     const paddleLv=Number(brickPlayer&&brickPlayer.paddle_level)||1; const ballLv=Number(brickPlayer&&brickPlayer.ball_level)||1;
     const diff=getBrickDifficulty(stage);
-    const earlyPaddleBonus=stage<=1?42:(stage===2?28:0);
-    brickPaddle={x:W/2,y:H-38,w:Math.max(54,74+earlyPaddleBonus+Math.min(54,(paddleLv-1)*10)-diff.paddlePenalty),h:12,speed:285+Math.min(35,diff.tier*4)};
+    brickPaddle={x:W/2,y:H-38,w:Math.max(54,74+Math.min(54,(paddleLv-1)*10)-diff.paddlePenalty),h:12,speed:285+Math.min(35,diff.tier*4)};
     brickBalls=[]; const count=Math.min(4,ballLv); for(let i=0;i<count;i++)brickBalls.push(makeBall(i,count));
     brickMessage=brickPlayer?'시작 버튼 또는 Space로 발사':'이름을 입력하고 불러오기';
     stopBrickLoop(); brickDraw();
@@ -3341,9 +3340,9 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
       const holeChance=Math.max(2,10-Math.floor(stage/12));
       if(stage>4&&seed<holeChance)continue;
       let type='normal';
-      let hp=1+d.hpBonus+Math.floor(r/3);
+      let hp=stage<=2?1:1+d.hpBonus+Math.floor(r/3);
       let reward=4+Math.floor(stage/5)+Math.floor(hp*2);
-      if(stage>1&&seed>76){type='hard';hp+=1+Math.floor(stage/18);reward+=9;}
+      if(stage>2&&seed>76){type='hard';hp+=1+Math.floor(stage/18);reward+=9;}
       if(stage>2&&seed>88){type='gold';hp+=Math.floor(stage/20);reward+=28+stage;}
       if(stage>5&&seed>=68&&seed<75){type='multi';hp+=1;reward+=12;}
       if(stage>12&&seed>=60&&seed<66){type='pierce';hp+=1+Math.floor(stage/25);reward+=14;}
