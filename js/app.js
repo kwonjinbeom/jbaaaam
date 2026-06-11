@@ -3638,10 +3638,10 @@ setTimeout(()=>loadGuestbook({silent:true}),500);
   async function idleLogEvent(key,label,text,amount=0){ if(!idlePlayer)return; try{ await sbFetch('/idle_event_logs',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify([{player_id:idlePlayer.id,event_key:key,event_label:label,effect_text:text,amount:Math.floor(amount)}])}); }catch(e){} }
   function idleCasinoBet(type,money){
     const m=Math.max(0,n(money));
-    if(type==='coin')return Math.max(100,Math.min(m*.10,50000000));
-    if(type==='slot')return Math.max(500,Math.min(m*.18,120000000));
-    if(type==='lotto')return Math.max(2000,Math.min(m*.30,300000000));
-    return 100;
+    if(type==='coin')return Math.floor(Math.min(m,Math.max(100,m*.10)));
+    if(type==='slot')return Math.floor(Math.min(m,Math.max(500,m*.18)));
+    if(type==='lotto')return Math.floor(Math.min(m,Math.max(2000,m*.30)));
+    return Math.floor(Math.min(m,100));
   }
   function idleCasinoInfo(){
     return {
